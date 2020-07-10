@@ -1,5 +1,3 @@
-// +build !purego
-
 // Package fasttime provides a fast clock implementation, roughly 2.5x faster
 // than time.Now.
 package fasttime
