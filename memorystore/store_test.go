@@ -59,7 +59,7 @@ func TestStore_Take(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer s.Stop()
+			defer s.Close()
 
 			type result struct {
 				limit, remaining uint64

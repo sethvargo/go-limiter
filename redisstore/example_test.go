@@ -26,7 +26,7 @@ func ExampleNew() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer store.Stop()
+	defer store.Close()
 
 	limit, remaining, reset, ok := store.Take("my-key")
 	_, _, _, _ = limit, remaining, reset, ok
