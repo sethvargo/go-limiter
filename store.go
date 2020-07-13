@@ -1,5 +1,7 @@
 package limiter
 
+import "io"
+
 // Store is an interface for limiter storage backends.
 //
 // Keys should be hash, sanitized, or otherwise scrubbed of identifiable
@@ -24,8 +26,8 @@ type Store interface {
 	// See the note about keys on the interface documentation.
 	Take(key string) (limit, remaining, reset uint64, ok bool)
 
-	// Stop terminates the store and cleans up any data structures or connections
+	// Close terminates the store and cleans up any data structures or connections
 	// that may remain open. After a store is stopped, Take() should always return
 	// zero values.
-	Stop()
+	io.Closer
 }

@@ -172,14 +172,15 @@ func (s *store) Take(key string) (uint64, uint64, uint64, bool) {
 	return s.tokens, tokens, next, ok == 1
 }
 
-// Stop stops the memory limiter and cleans up any outstanding sessions. You
-// should absolutely always call Stop() as it releases the memory consumed by
-// the map AND releases the tickers.
-func (s *store) Stop() {
+// Close stops the memory limiter and cleans up any outstanding sessions. You
+// should absolutely always call Close() as it releases any open network
+// connections.
+func (s *store) Close() error {
 	if !atomic.CompareAndSwapUint32(&s.stopped, 0, 1) {
-		return
+		return nil
 	}
 
 	// Close the connection pool.
 	s.pool.close()
+	return nil
 }

@@ -146,12 +146,12 @@ func (s *store) Take(key string) (uint64, uint64, uint64, bool) {
 	return b.take()
 }
 
-// Stop stops the memory limiter and cleans up any outstanding sessions. You
-// should absolutely always call Stop() as it releases the memory consumed by
+// Close stops the memory limiter and cleans up any outstanding sessions. You
+// should absolutely always call Close() as it releases the memory consumed by
 // the map AND releases the tickers.
-func (s *store) Stop() {
+func (s *store) Close() error {
 	if !atomic.CompareAndSwapUint32(&s.stopped, 0, 1) {
-		return
+		return nil
 	}
 
 	// Close the channel to prevent future purging.
@@ -163,6 +163,7 @@ func (s *store) Stop() {
 		delete(s.data, k)
 	}
 	s.dataLock.Unlock()
+	return nil
 }
 
 // purge continually iterates over the map and purges old values on the provided

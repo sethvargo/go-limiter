@@ -55,7 +55,7 @@ func BenchmarkSethVargoMemory(b *testing.B) {
 					store.Take(testSessionID(b, i))
 				}
 				b.StopTimer()
-				store.Stop()
+				store.Close()
 			})
 
 			b.Run("parallel", func(b *testing.B) {
@@ -76,7 +76,7 @@ func BenchmarkSethVargoMemory(b *testing.B) {
 					}
 				})
 				b.StopTimer()
-				store.Stop()
+				store.Close()
 			})
 		})
 	}
@@ -136,7 +136,7 @@ func BenchmarkSethVargoRedis(b *testing.B) {
 					store.Take(testSessionID(b, i))
 				}
 				b.StopTimer()
-				store.Stop()
+				store.Close()
 			})
 
 			b.Run("parallel", func(b *testing.B) {
@@ -166,7 +166,7 @@ func BenchmarkSethVargoRedis(b *testing.B) {
 					}
 				})
 				b.StopTimer()
-				store.Stop()
+				store.Close()
 			})
 		})
 	}
