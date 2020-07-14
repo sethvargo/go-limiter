@@ -142,3 +142,9 @@ machine since there's no way to share the state.
 
 Redis uses Redis + Lua as a shared pool, but comes at a performance cost.
 [Learn more](https://pkg.go.dev/github.com/sethvargo/go-limiter/redisstore).
+
+#### Noop
+
+Noop does no rate limiting, but still implements the interface - useful for
+testing and local development.
+[Learn more](https://pkg.go.dev/github.com/sethvargo/go-limiter/noopstore).
