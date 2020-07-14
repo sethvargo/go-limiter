@@ -8,6 +8,10 @@ var _ limiter.Store = (*store)(nil)
 
 type store struct{}
 
+func New() (limiter.Store, error) {
+	return &store{}, nil
+}
+
 // Take always allows the request.
 func (s *store) Take(_ string) (uint64, uint64, uint64, bool) {
 	return 0, 0, 0, true
