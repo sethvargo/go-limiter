@@ -139,8 +139,7 @@ func (s *store) Take(key string) (uint64, uint64, uint64, bool) {
 	// collected), so create the bucket and take an initial request.
 	b := newBucket(s.tokens, s.interval, s.rate)
 
-	// Add it to the map. Since this is the first time, they can't possibly be
-	// rate limited yet, so return true.
+	// Add it to the map and take.
 	s.data[key] = b
 	s.dataLock.Unlock()
 	return b.take()
