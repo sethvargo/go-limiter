@@ -7,8 +7,6 @@ import (
 	"sort"
 	"testing"
 	"time"
-
-	"github.com/sethvargo/go-limiter/fasttime"
 )
 
 func testKey(tb testing.TB) string {
@@ -72,7 +70,7 @@ func TestStore_Take(t *testing.T) {
 			for i := uint64(1); i <= 2*tc.tokens; i++ {
 				go func() {
 					limit, remaining, reset, ok := s.Take(key)
-					takeCh <- &result{limit, remaining, time.Duration(fasttime.Now() - reset), ok}
+					takeCh <- &result{limit, remaining, time.Duration(fastnow() - reset), ok}
 				}()
 			}
 
