@@ -3,6 +3,10 @@
 // Package fasttime gets wallclock time, but super fast.
 package fasttime
 
+import (
+	_ "unsafe"
+)
+
 //go:noescape
 //go:linkname walltime runtime.walltime
 func walltime() (int64, int32)
