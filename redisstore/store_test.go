@@ -25,6 +25,10 @@ func testKey(tb testing.TB) string {
 func TestStore_Take(t *testing.T) {
 	t.Parallel()
 
+	if testing.Short() {
+		t.Skipf("skipping (short)")
+	}
+
 	host := os.Getenv("REDIS_HOST")
 	if host == "" {
 		t.Fatal("missing REDIS_HOST")
