@@ -12,16 +12,20 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-
     strategy:
       fail-fast: false
       matrix:
+        os:
+        - 'macos-latest'
+        - 'ubuntu-latest'
+        - 'windows-latest'
         redis:
         - '6.0'
         - '5.0'
 
     name: redis-${{ matrix.redis }}
+
+    runs-on: ${{ matrix.os }}
 
     services:
       redis:
