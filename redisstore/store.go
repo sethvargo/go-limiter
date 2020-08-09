@@ -19,14 +19,29 @@ type store struct {
 	interval time.Duration
 	rate     float64
 	ttl      uint64
+	pool     *pool
 
-	pool *pool
+	failureMode FailureMode
 
 	luaScript    string
 	luaScriptSHA string
 
 	stopped uint32
 }
+
+// FailureMode specifies the failure mode.
+type FailureMode int
+
+const (
+	// FailClosed indicates the system should disallow requests if it cannot
+	// connect to the redis backend.
+	//
+	// FailOpen indicates the system should allow reqeusts if it cannot connect to
+	// the redis backend.
+	_ FailureMode = iota
+	FailClosed
+	FailOpen
+)
 
 // Config is used as input to New. It defines the behavior of the storage
 // system.
@@ -55,6 +70,10 @@ type Config struct {
 	// AuthUsername and AuthPassword are optional authentication information.
 	AuthUsername string
 	AuthPassword string
+
+	// FailureMode indicates how the system should fail if it cannot connect to
+	// the redis backend.
+	FailureMode FailureMode
 }
 
 // New uses a Redis instance to back a rate limiter that to limit the number of
@@ -94,6 +113,11 @@ func New(c *Config) (limiter.Store, error) {
 		maxPoolSize = c.MaxPoolSize
 	}
 
+	failureMode := FailClosed
+	if c.FailureMode != 0 {
+		failureMode = c.FailureMode
+	}
+
 	dialFunc := c.DialFunc
 	if dialFunc == nil {
 		return nil, fmt.Errorf("missing DialFunc")
@@ -118,10 +142,16 @@ func New(c *Config) (limiter.Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get client to configure lua: %w", err)
 	}
-	defer client.release(pool)
 
 	if _, err := client.do("SCRIPT", "LOAD", luaScript); err != nil {
+		if closeErr := client.release(pool); err != nil {
+			return nil, fmt.Errorf("failed to prime script: %v, but then failed to close client: %w", err, closeErr)
+		}
 		return nil, fmt.Errorf("failed to prime script: %v", err)
+	}
+
+	if err := client.release(pool); err != nil {
+		return nil, fmt.Errorf("failed to close client: %w", err)
 	}
 
 	s := &store{
@@ -130,6 +160,8 @@ func New(c *Config) (limiter.Store, error) {
 		rate:     rate,
 		ttl:      ttl,
 		pool:     pool,
+
+		failureMode: failureMode,
 
 		luaScript:    luaScript,
 		luaScriptSHA: luaScriptSHA,
@@ -151,21 +183,36 @@ func (s *store) Take(key string) (uint64, uint64, uint64, bool) {
 	// Get a client from the pool.
 	c, err := s.pool.get()
 	if err != nil {
-		return 0, 0, 0, false
+		switch s.failureMode {
+		case FailClosed:
+			return 0, 0, 0, false
+		case FailOpen:
+			return 0, 0, 0, true
+		}
 	}
-	defer func() { _ = c.release(s.pool) }()
+	defer c.release(s.pool)
 
 	now := uint64(time.Now().UTC().UnixNano())
 	nowStr := strconv.FormatUint(now, 10)
 
 	resp, err := c.do("EVAL", s.luaScript, "1", key, nowStr)
 	if err != nil {
-		return 0, 0, 0, false
+		switch s.failureMode {
+		case FailClosed:
+			return 0, 0, 0, false
+		case FailOpen:
+			return 0, 0, 0, true
+		}
 	}
 
 	a := resp.array()
 	if len(a) < 3 {
-		return 0, 0, 0, false
+		switch s.failureMode {
+		case FailClosed:
+			return 0, 0, 0, false
+		case FailOpen:
+			return 0, 0, 0, true
+		}
 	}
 
 	tokens, next, ok := a[0].uint64(), a[1].uint64(), a[2].uint64()
