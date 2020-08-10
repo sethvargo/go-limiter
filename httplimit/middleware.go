@@ -13,6 +13,10 @@ import (
 	"time"
 
 	"github.com/sethvargo/go-limiter"
+
+	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel/api/kv"
+	"go.opentelemetry.io/otel/api/metric"
 )
 
 const (
@@ -62,8 +66,10 @@ func IPKeyFunc(headers ...string) KeyFunc {
 // rate limiting. It can rate limit based on an arbitrary KeyFunc, and supports
 // anything that implements limiter.Store.
 type Middleware struct {
-	store   limiter.Store
-	keyFunc KeyFunc
+	store      limiter.Store
+	keyFunc    KeyFunc
+	meter      metric.Meter
+	reqCounter metric.Int64Counter
 }
 
 // NewMiddleware creates a new middleware suitable for use as an HTTP handler.
@@ -77,9 +83,17 @@ func NewMiddleware(s limiter.Store, f KeyFunc) (*Middleware, error) {
 		return nil, fmt.Errorf("key function cannot be nil")
 	}
 
+	meter := global.Meter("github.com/sethvargo/go-limiter")
+	rc, err := meter.NewInt64Counter("request_count", metric.WithDescription("counts number of requests processed by middleware and their status"))
+	if err != nil {
+		return nil, err
+	}
+
 	return &Middleware{
-		store:   s,
-		keyFunc: f,
+		store:      s,
+		keyFunc:    f,
+		meter:      meter,
+		reqCounter: rc,
 	}, nil
 }
 
@@ -105,6 +119,13 @@ func (m *Middleware) Handle(next http.Handler) http.Handler {
 		w.Header().Set(HeaderRateLimitLimit, strconv.FormatUint(limit, 10))
 		w.Header().Set(HeaderRateLimitRemaining, strconv.FormatUint(remaining, 10))
 		w.Header().Set(HeaderRateLimitReset, resetTime)
+
+		// Record request status
+		m.meter.RecordBatch(
+			r.Context(),
+			[]kv.KeyValue{kv.Bool("ok", ok)},
+			m.reqCounter.Measurement(1),
+		)
 
 		// Fail if there were no tokens remaining.
 		if !ok {
