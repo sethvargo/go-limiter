@@ -60,6 +60,7 @@ if next(data) == nil then
   lasttick = 0
   tokens   = maxtokens-1
   redis.call(C_HSET, key, F_START, start, F_TICK, lasttick, F_TOKENS, tokens)
+  redis.call(C_EXPIRE, key, ttl)
 
   local nexttime = start + interval
   return {tokens, nexttime, true}
@@ -76,11 +77,13 @@ if lasttick < currtick then
   tokens = availabletokens(lasttick, currtick, maxtokens, rate)
   lasttick = currtick
   redis.call(C_HSET, key, F_TICK, lasttick, F_TOKENS, tokens)
+  redis.call(C_EXPIRE, key, ttl)
 end
 
 if tokens > 0 then
   tokens = tokens-1
   redis.call(C_HSET, key, F_TOKENS, tokens)
+  redis.call(C_EXPIRE, key, ttl)
 
   return {tokens, nexttime, true}
 end
