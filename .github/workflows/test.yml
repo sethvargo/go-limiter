@@ -44,51 +44,6 @@ jobs:
     - name: Test
       run: make test
 
-  # Redis runs all the tests, including redis, etc.
-  redis:
-    strategy:
-      fail-fast: false
-      matrix:
-        redis:
-        - '6.0'
-        - '5.0'
-
-    runs-on: 'ubuntu-latest'
-
-    services:
-      redis:
-        image: bitnami/redis:${{ matrix.redis }}
-        env:
-          REDIS_PASSWORD: testing123
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-        - 6379:6379
-
-    steps:
-    - uses: actions/checkout@v2
-
-    - uses: actions/setup-go@v2
-      with:
-        go-version: '1.14'
-
-    - uses: actions/cache@v2
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-
-    - name: Test
-      run: go test ./memorystore/...
-      env:
-        REDIS_HOST: 127.0.0.1
-        REDIS_PORT: 6379
-        REDIS_PASS: testing123
-
   # build runs go build on the target platforms to ensure the runtime links are
   # correct.
   build:
