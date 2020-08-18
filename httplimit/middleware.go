@@ -98,7 +98,12 @@ func (m *Middleware) Handle(next http.Handler) http.Handler {
 		}
 
 		// Take from the store.
-		limit, remaining, reset, ok := m.store.Take(key)
+		limit, remaining, reset, ok, err := m.store.Take(key)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
 		resetTime := time.Unix(0, int64(reset)).UTC().Format(time.RFC1123)
 
 		// Set headers (we do this regardless of whether the request is permitted).

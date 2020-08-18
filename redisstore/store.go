@@ -21,27 +21,11 @@ type store struct {
 	ttl      uint64
 	pool     *pool
 
-	failureMode FailureMode
-
 	luaScript    string
 	luaScriptSHA string
 
 	stopped uint32
 }
-
-// FailureMode specifies the failure mode.
-type FailureMode int
-
-const (
-	// FailClosed indicates the system should disallow requests if it cannot
-	// connect to the redis backend.
-	//
-	// FailOpen indicates the system should allow reqeusts if it cannot connect to
-	// the redis backend.
-	_ FailureMode = iota
-	FailClosed
-	FailOpen
-)
 
 // Config is used as input to New. It defines the behavior of the storage
 // system.
@@ -70,10 +54,6 @@ type Config struct {
 	// AuthUsername and AuthPassword are optional authentication information.
 	AuthUsername string
 	AuthPassword string
-
-	// FailureMode indicates how the system should fail if it cannot connect to
-	// the redis backend.
-	FailureMode FailureMode
 }
 
 // New uses a Redis instance to back a rate limiter that to limit the number of
@@ -111,11 +91,6 @@ func New(c *Config) (limiter.Store, error) {
 	maxPoolSize := uint64(5)
 	if c.InitialPoolSize > 0 {
 		maxPoolSize = c.MaxPoolSize
-	}
-
-	failureMode := FailClosed
-	if c.FailureMode != 0 {
-		failureMode = c.FailureMode
 	}
 
 	dialFunc := c.DialFunc
@@ -161,8 +136,6 @@ func New(c *Config) (limiter.Store, error) {
 		ttl:      ttl,
 		pool:     pool,
 
-		failureMode: failureMode,
-
 		luaScript:    luaScript,
 		luaScriptSHA: luaScriptSHA,
 	}
@@ -174,49 +147,41 @@ func New(c *Config) (limiter.Store, error) {
 // limit, remaining tokens, and reset time, if one was found. Any errors
 // connecting to the store or parsing the return value are considered failures
 // and fail the take.
-func (s *store) Take(key string) (uint64, uint64, uint64, bool) {
+func (s *store) Take(key string) (tokens uint64, remaining uint64, next uint64, ok bool, retErr error) {
 	// If the store is stopped, all requests are rejected.
 	if atomic.LoadUint32(&s.stopped) == 1 {
-		return 0, 0, 0, false
+		return 0, 0, 0, false, limiter.ErrStopped
 	}
 
 	// Get a client from the pool.
 	c, err := s.pool.get()
 	if err != nil {
-		switch s.failureMode {
-		case FailClosed:
-			return 0, 0, 0, false
-		case FailOpen:
-			return 0, 0, 0, true
-		}
+		retErr = fmt.Errorf("failed to get redis client from pool: %w", err)
+		return 0, 0, 0, false, retErr
 	}
-	defer c.release(s.pool)
+	defer func() {
+		if err := c.release(s.pool); err != nil {
+			retErr = fmt.Errorf("failed to release pool: %v, original error: %w", err, retErr)
+		}
+	}()
 
 	now := uint64(time.Now().UTC().UnixNano())
 	nowStr := strconv.FormatUint(now, 10)
 
 	resp, err := c.do("EVAL", s.luaScript, "1", key, nowStr)
 	if err != nil {
-		switch s.failureMode {
-		case FailClosed:
-			return 0, 0, 0, false
-		case FailOpen:
-			return 0, 0, 0, true
-		}
+		retErr = fmt.Errorf("failed to EVAL script: %w", err)
+		return 0, 0, 0, false, retErr
 	}
 
 	a := resp.array()
 	if len(a) < 3 {
-		switch s.failureMode {
-		case FailClosed:
-			return 0, 0, 0, false
-		case FailOpen:
-			return 0, 0, 0, true
-		}
+		retErr = fmt.Errorf("response has less than 3 values: %#v", a)
+		return 0, 0, 0, false, retErr
 	}
 
-	tokens, next, ok := a[0].uint64(), a[1].uint64(), a[2].uint64()
-	return s.tokens, tokens, next, ok == 1
+	tokens, next, ok = a[0].uint64(), a[1].uint64(), a[2].uint64() == 1
+	return s.tokens, tokens, next, ok, nil
 }
 
 // Close stops the memory limiter and cleans up any outstanding sessions. You
