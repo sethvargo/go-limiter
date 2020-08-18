@@ -147,7 +147,7 @@ func New(c *Config) (limiter.Store, error) {
 // limit, remaining tokens, and reset time, if one was found. Any errors
 // connecting to the store or parsing the return value are considered failures
 // and fail the take.
-func (s *store) Take(key string) (uint64, uint64, uint64, bool, error) {
+func (s *store) Take(key string) (tokens uint64, remaining uint64, next uint64, ok bool, retErr error) {
 	// If the store is stopped, all requests are rejected.
 	if atomic.LoadUint32(&s.stopped) == 1 {
 		return 0, 0, 0, false, limiter.ErrStopped
@@ -156,25 +156,32 @@ func (s *store) Take(key string) (uint64, uint64, uint64, bool, error) {
 	// Get a client from the pool.
 	c, err := s.pool.get()
 	if err != nil {
-		return 0, 0, 0, false, fmt.Errorf("failed to get redis client from pool: %w", err)
+		retErr = fmt.Errorf("failed to get redis client from pool: %w", err)
+		return 0, 0, 0, false, retErr
 	}
-	defer c.release(s.pool)
+	defer func() {
+		if err := c.release(s.pool); err != nil {
+			retErr = fmt.Errorf("failed to release pool: %v, original error: %w", err, retErr)
+		}
+	}()
 
 	now := uint64(time.Now().UTC().UnixNano())
 	nowStr := strconv.FormatUint(now, 10)
 
 	resp, err := c.do("EVAL", s.luaScript, "1", key, nowStr)
 	if err != nil {
-		return 0, 0, 0, false, fmt.Errorf("failed to EVAL script: %w", err)
+		retErr = fmt.Errorf("failed to EVAL script: %w", err)
+		return 0, 0, 0, false, retErr
 	}
 
 	a := resp.array()
 	if len(a) < 3 {
-		return 0, 0, 0, false, fmt.Errorf("response has less than 3 values: %#v", a)
+		retErr = fmt.Errorf("response has less than 3 values: %#v", a)
+		return 0, 0, 0, false, retErr
 	}
 
-	tokens, next, ok := a[0].uint64(), a[1].uint64(), a[2].uint64()
-	return s.tokens, tokens, next, ok == 1, nil
+	tokens, next, ok = a[0].uint64(), a[1].uint64(), a[2].uint64() == 1
+	return s.tokens, tokens, next, ok, nil
 }
 
 // Close stops the memory limiter and cleans up any outstanding sessions. You
