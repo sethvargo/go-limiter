@@ -141,7 +141,7 @@ machine since there's no way to share the state.
 #### Redis
 
 Redis uses Redis + Lua as a shared pool, but comes at a performance cost.
-[Learn more](https://pkg.go.dev/github.com/sethvargo/go-limiter/redisstore).
+[Learn more](https://pkg.go.dev/github.com/sethvargo/go-redisstore).
 
 #### Noop
 

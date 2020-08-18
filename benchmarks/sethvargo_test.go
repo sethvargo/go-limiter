@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/sethvargo/go-limiter/memorystore"
-	"github.com/sethvargo/go-limiter/redisstore"
+	"github.com/sethvargo/go-redisstore"
 )
 
 func BenchmarkSethVargoMemory(b *testing.B) {
