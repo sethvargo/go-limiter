@@ -65,14 +65,15 @@ func TestStore_Take(t *testing.T) {
 				limit, remaining uint64
 				reset            time.Duration
 				ok               bool
+				err              error
 			}
 
 			// Take twice everything from the bucket.
 			takeCh := make(chan *result, 2*tc.tokens)
 			for i := uint64(1); i <= 2*tc.tokens; i++ {
 				go func() {
-					limit, remaining, reset, ok := s.Take(key)
-					takeCh <- &result{limit, remaining, time.Duration(fasttime.Now() - reset), ok}
+					limit, remaining, reset, ok, err := s.Take(key)
+					takeCh <- &result{limit, remaining, time.Duration(fasttime.Now() - reset), ok, err}
 				}()
 			}
 
@@ -94,6 +95,10 @@ func TestStore_Take(t *testing.T) {
 			})
 
 			for i, result := range results {
+				if err := result.err; err != nil {
+					t.Fatal(err)
+				}
+
 				if got, want := result.limit, tc.tokens; got != want {
 					t.Errorf("limit: expected %d to be %d", got, want)
 				}
@@ -123,7 +128,11 @@ func TestStore_Take(t *testing.T) {
 			time.Sleep(tc.interval)
 
 			// Verify we can take once more.
-			if _, _, _, ok := s.Take(key); !ok {
+			_, _, _, ok, err := s.Take(key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !ok {
 				t.Errorf("expected %t to be %t", ok, true)
 			}
 		})

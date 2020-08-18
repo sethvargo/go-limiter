@@ -111,10 +111,10 @@ func New(c *Config) (limiter.Store, error) {
 // Take attempts to remove a token from the named key. If the take is
 // successful, it returns true, otherwise false. It also returns the configured
 // limit, remaining tokens, and reset time.
-func (s *store) Take(key string) (uint64, uint64, uint64, bool) {
+func (s *store) Take(key string) (uint64, uint64, uint64, bool, error) {
 	// If the store is stopped, all requests are rejected.
 	if atomic.LoadUint32(&s.stopped) == 1 {
-		return 0, 0, 0, false
+		return 0, 0, 0, false, limiter.ErrStopped
 	}
 
 	// Acquire a read lock first - this allows other to concurrently check limits
@@ -248,7 +248,7 @@ func newBucket(tokens uint64, interval time.Duration, rate float64) *bucket {
 // available and the clock has ticked forward, it recalculates the number of
 // tokens and retries. It returns the limit, remaining tokens, time until
 // refresh, and whether the take was successful.
-func (b *bucket) take() (uint64, uint64, uint64, bool) {
+func (b *bucket) take() (uint64, uint64, uint64, bool, error) {
 	// Capture the current request time, current tick, and amount of time until
 	// the bucket resets.
 	now := fasttime.Now()
@@ -284,11 +284,11 @@ func (b *bucket) take() (uint64, uint64, uint64, bool) {
 				continue
 			}
 
-			return b.maxTokens, tokens, next, true
+			return b.maxTokens, tokens, next, true, nil
 		}
 
 		// Returning the TTL until next tick.
-		return b.maxTokens, 0, next, false
+		return b.maxTokens, 0, next, false, nil
 	}
 }
 

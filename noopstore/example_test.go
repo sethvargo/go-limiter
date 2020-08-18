@@ -13,6 +13,9 @@ func ExampleNew() {
 	}
 	defer store.Close()
 
-	limit, remaining, reset, ok := store.Take("my-key")
+	limit, remaining, reset, ok, err := store.Take("my-key")
+	if err != nil {
+		log.Fatal(err)
+	}
 	_, _, _, _ = limit, remaining, reset, ok
 }

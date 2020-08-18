@@ -13,8 +13,8 @@ func New() (limiter.Store, error) {
 }
 
 // Take always allows the request.
-func (s *store) Take(_ string) (uint64, uint64, uint64, bool) {
-	return 0, 0, 0, true
+func (s *store) Take(_ string) (uint64, uint64, uint64, bool, error) {
+	return 0, 0, 0, true, nil
 }
 
 // Close does nothing.
