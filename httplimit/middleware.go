@@ -60,15 +60,15 @@ func IPKeyFunc(headers ...string) KeyFunc {
 
 // Middleware is a handler/mux that can wrap other middlware to implement HTTP
 // rate limiting. It can rate limit based on an arbitrary KeyFunc, and supports
-// anything that implements limiter.Store.
+// anything that implements limiter.StoreWithContext.
 type Middleware struct {
-	store   limiter.Store
+	store   limiter.StoreWithContext
 	keyFunc KeyFunc
 }
 
 // NewMiddleware creates a new middleware suitable for use as an HTTP handler.
 // This function returns an error if either the Store or KeyFunc are nil.
-func NewMiddleware(s limiter.Store, f KeyFunc) (*Middleware, error) {
+func NewMiddleware(s limiter.StoreWithContext, f KeyFunc) (*Middleware, error) {
 	if s == nil {
 		return nil, fmt.Errorf("store cannot be nil")
 	}
@@ -90,6 +90,8 @@ func NewMiddleware(s limiter.Store, f KeyFunc) (*Middleware, error) {
 // metadata about when it's safe to retry.
 func (m *Middleware) Handle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
 		// Call the key function - if this fails, it's an internal server error.
 		key, err := m.keyFunc(r)
 		if err != nil {
@@ -98,7 +100,7 @@ func (m *Middleware) Handle(next http.Handler) http.Handler {
 		}
 
 		// Take from the store.
-		limit, remaining, reset, ok, err := m.store.Take(key)
+		limit, remaining, reset, ok, err := m.store.TakeWithContext(ctx, key)
 		if err != nil {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
