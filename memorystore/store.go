@@ -2,6 +2,7 @@
 package memorystore
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,6 +13,7 @@ import (
 )
 
 var _ limiter.Store = (*store)(nil)
+var _ limiter.StoreWithContext = (*store)(nil)
 
 type store struct {
 	tokens   uint64
@@ -63,7 +65,7 @@ type Config struct {
 // New creates an in-memory rate limiter that uses a bucketing model to limit
 // the number of permitted events over an interval. It's optimized for runtime
 // and memory efficiency.
-func New(c *Config) (limiter.Store, error) {
+func New(c *Config) (limiter.StoreWithContext, error) {
 	if c == nil {
 		c = new(Config)
 	}
@@ -108,10 +110,16 @@ func New(c *Config) (limiter.Store, error) {
 	return s, nil
 }
 
-// Take attempts to remove a token from the named key. If the take is
+// Take attempts to remove a token from the named key. See TakeWithContext for
+// more information.
+func (s *store) Take(key string) (uint64, uint64, uint64, bool, error) {
+	return s.TakeWithContext(context.Background(), key)
+}
+
+// TakeWithContext attempts to remove a token from the named key. If the take is
 // successful, it returns true, otherwise false. It also returns the configured
 // limit, remaining tokens, and reset time.
-func (s *store) Take(key string) (uint64, uint64, uint64, bool, error) {
+func (s *store) TakeWithContext(ctx context.Context, key string) (uint64, uint64, uint64, bool, error) {
 	// If the store is stopped, all requests are rejected.
 	if atomic.LoadUint32(&s.stopped) == 1 {
 		return 0, 0, 0, false, limiter.ErrStopped
@@ -145,10 +153,15 @@ func (s *store) Take(key string) (uint64, uint64, uint64, bool, error) {
 	return b.take()
 }
 
-// Close stops the memory limiter and cleans up any outstanding sessions. You
-// should absolutely always call Close() as it releases the memory consumed by
-// the map AND releases the tickers.
+// Close stops the memory limiter. See CloseWithContext for more information.
 func (s *store) Close() error {
+	return s.CloseWithContext(context.Background())
+}
+
+// CloseWithContext stops the memory limiter and cleans up any outstanding
+// sessions. You should always call Close() or CloseWithContext() as it releases
+// the memory consumed by the map AND releases the tickers.
+func (s *store) CloseWithContext(ctx context.Context) error {
 	if !atomic.CompareAndSwapUint32(&s.stopped, 0, 1) {
 		return nil
 	}

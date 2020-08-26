@@ -1,6 +1,7 @@
 package limiter
 
 import (
+	"context"
 	"fmt"
 	"io"
 )
@@ -38,4 +39,16 @@ type Store interface {
 	// that may remain open. After a store is stopped, Take() should always return
 	// zero values.
 	io.Closer
+}
+
+// StoreWithContext is an interface for storage backends that accept context
+// values.
+type StoreWithContext interface {
+	Store
+
+	// TakeWithContext is like Take, but passes in the provided context.
+	TakeWithContext(ctx context.Context, key string) (limit, remaining, reset uint64, ok bool, err error)
+
+	// CloseWithContext is like Close, but passes in the provided context.
+	CloseWithContext(ctx context.Context) error
 }
