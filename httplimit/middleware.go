@@ -62,13 +62,13 @@ func IPKeyFunc(headers ...string) KeyFunc {
 // rate limiting. It can rate limit based on an arbitrary KeyFunc, and supports
 // anything that implements limiter.StoreWithContext.
 type Middleware struct {
-	store   limiter.StoreWithContext
+	store   limiter.Store
 	keyFunc KeyFunc
 }
 
 // NewMiddleware creates a new middleware suitable for use as an HTTP handler.
 // This function returns an error if either the Store or KeyFunc are nil.
-func NewMiddleware(s limiter.StoreWithContext, f KeyFunc) (*Middleware, error) {
+func NewMiddleware(s limiter.Store, f KeyFunc) (*Middleware, error) {
 	if s == nil {
 		return nil, fmt.Errorf("store cannot be nil")
 	}
@@ -100,7 +100,7 @@ func (m *Middleware) Handle(next http.Handler) http.Handler {
 		}
 
 		// Take from the store.
-		limit, remaining, reset, ok, err := m.store.TakeWithContext(ctx, key)
+		limit, remaining, reset, ok, err := m.store.Take(ctx, key)
 		if err != nil {
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return

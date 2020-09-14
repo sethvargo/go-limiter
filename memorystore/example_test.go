@@ -1,6 +1,7 @@
 package memorystore_test
 
 import (
+	"context"
 	"log"
 	"time"
 
@@ -8,6 +9,8 @@ import (
 )
 
 func ExampleNew() {
+	ctx := context.Background()
+
 	store, err := memorystore.New(&memorystore.Config{
 		Tokens:   15,
 		Interval: time.Minute,
@@ -15,9 +18,9 @@ func ExampleNew() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer store.Close()
+	defer store.Close(ctx)
 
-	limit, remaining, reset, ok, err := store.Take("my-key")
+	limit, remaining, reset, ok, err := store.Take(ctx, "my-key")
 	if err != nil {
 		log.Fatal(err)
 	}
