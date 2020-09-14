@@ -4,35 +4,30 @@ package noopstore
 
 import (
 	"context"
+	"time"
 
 	"github.com/sethvargo/go-limiter"
 )
 
 var _ limiter.Store = (*store)(nil)
-var _ limiter.StoreWithContext = (*store)(nil)
 
 type store struct{}
 
-func New() (limiter.StoreWithContext, error) {
+func New() (limiter.Store, error) {
 	return &store{}, nil
 }
 
 // Take always allows the request.
-func (s *store) Take(_ string) (uint64, uint64, uint64, bool, error) {
+func (s *store) Take(_ context.Context, _ string) (uint64, uint64, uint64, bool, error) {
 	return 0, 0, 0, true, nil
 }
 
-// TakeWithContext always allows the request.
-func (s *store) TakeWithContext(_ context.Context, _ string) (uint64, uint64, uint64, bool, error) {
-	return 0, 0, 0, true, nil
-}
-
-// Close does nothing.
-func (s *store) Close() error {
+// Set does nothing.
+func (s *store) Set(_ context.Context, _ string, _ uint64, _ time.Duration) error {
 	return nil
 }
 
-// CloseWithContext does nothing.
-func (s *store) CloseWithContext(_ context.Context) error {
+// Close does nothing.
+func (s *store) Close(_ context.Context) error {
 	return nil
 }

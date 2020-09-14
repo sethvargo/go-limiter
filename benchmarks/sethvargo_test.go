@@ -1,17 +1,20 @@
 package benchmarks
 
 import (
+	"context"
 	"math"
-	"net"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/sethvargo/go-limiter/memorystore"
 	"github.com/sethvargo/go-redisstore"
 )
 
 func BenchmarkSethVargoMemory(b *testing.B) {
+	ctx := context.Background()
+
 	cases := []struct {
 		name          string
 		tokens        uint64
@@ -49,13 +52,17 @@ func BenchmarkSethVargoMemory(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
+				b.Cleanup(func() {
+					if err := store.Close(ctx); err != nil {
+						b.Fatal(err)
+					}
+				})
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
-					store.Take(testSessionID(b, i))
+					store.Take(ctx, testSessionID(b, i))
 				}
 				b.StopTimer()
-				store.Close()
 			})
 
 			b.Run("parallel", func(b *testing.B) {
@@ -68,21 +75,27 @@ func BenchmarkSethVargoMemory(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
+				b.Cleanup(func() {
+					if err := store.Close(ctx); err != nil {
+						b.Fatal(err)
+					}
+				})
 				b.ResetTimer()
 
 				b.RunParallel(func(pb *testing.PB) {
 					for i := 0; pb.Next(); i++ {
-						store.Take(testSessionID(b, i))
+						store.Take(ctx, testSessionID(b, i))
 					}
 				})
 				b.StopTimer()
-				store.Close()
 			})
 		})
 	}
 }
 
 func BenchmarkSethVargoRedis(b *testing.B) {
+	ctx := context.Background()
+
 	host := os.Getenv("REDIS_HOST")
 	if host == "" {
 		b.Fatal("missing REDIS_HOST")
@@ -114,59 +127,55 @@ func BenchmarkSethVargoRedis(b *testing.B) {
 			b.Run("serial", func(b *testing.B) {
 
 				store, err := redisstore.New(&redisstore.Config{
-					Interval:        tc.interval,
-					Tokens:          tc.tokens,
-					InitialPoolSize: 64,
-					MaxPoolSize:     128,
-					AuthPassword:    pass,
-					DialFunc: func() (net.Conn, error) {
-						conn, err := net.Dial("tcp", host+":"+port)
-						if err != nil {
-							return nil, err
-						}
-						return conn, nil
+					Tokens:   tc.tokens,
+					Interval: tc.interval,
+					Dial: func() (redis.Conn, error) {
+						return redis.Dial("tcp", host+":"+port,
+							redis.DialPassword(pass))
 					},
 				})
 				if err != nil {
 					b.Fatal(err)
 				}
+				b.Cleanup(func() {
+					if err := store.Close(ctx); err != nil {
+						b.Fatal(err)
+					}
+				})
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
-					store.Take(testSessionID(b, i))
+					store.Take(ctx, testSessionID(b, i))
 				}
 				b.StopTimer()
-				store.Close()
 			})
 
 			b.Run("parallel", func(b *testing.B) {
 
 				store, err := redisstore.New(&redisstore.Config{
-					Interval:        tc.interval,
-					Tokens:          tc.tokens,
-					InitialPoolSize: 64,
-					MaxPoolSize:     128,
-					AuthPassword:    pass,
-					DialFunc: func() (net.Conn, error) {
-						conn, err := net.Dial("tcp", host)
-						if err != nil {
-							return nil, err
-						}
-						return conn, nil
+					Tokens:   tc.tokens,
+					Interval: tc.interval,
+					Dial: func() (redis.Conn, error) {
+						return redis.Dial("tcp", host+":"+port,
+							redis.DialPassword(pass))
 					},
 				})
 				if err != nil {
 					b.Fatal(err)
 				}
+				b.Cleanup(func() {
+					if err := store.Close(ctx); err != nil {
+						b.Fatal(err)
+					}
+				})
 				b.ResetTimer()
 
 				b.RunParallel(func(pb *testing.PB) {
 					for i := 0; pb.Next(); i++ {
-						store.Take(testSessionID(b, i))
+						store.Take(ctx, testSessionID(b, i))
 					}
 				})
 				b.StopTimer()
-				store.Close()
 			})
 		})
 	}

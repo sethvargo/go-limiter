@@ -3,9 +3,11 @@ package limiter
 import (
 	"context"
 	"fmt"
-	"io"
+	"time"
 )
 
+// ErrStopped is the error returned when the store is stopped. All implementers
+// should return this error for stoppable stores.
 var ErrStopped = fmt.Errorf("store is stopped")
 
 // Store is an interface for limiter storage backends.
@@ -33,22 +35,15 @@ type Store interface {
 	// service the request.
 	//
 	// See the note about keys on the interface documentation.
-	Take(key string) (limit, remaining, reset uint64, ok bool, err error)
+	Take(ctx context.Context, key string) (tokens, remaining, reset uint64, ok bool, err error)
+
+	// Set configures the limit at the provided key. If a limit already exists, it
+	// is overwritten. This also sets the number of tokens in the bucket to the
+	// limit.
+	Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error
 
 	// Close terminates the store and cleans up any data structures or connections
 	// that may remain open. After a store is stopped, Take() should always return
 	// zero values.
-	io.Closer
-}
-
-// StoreWithContext is an interface for storage backends that accept context
-// values.
-type StoreWithContext interface {
-	Store
-
-	// TakeWithContext is like Take, but passes in the provided context.
-	TakeWithContext(ctx context.Context, key string) (limit, remaining, reset uint64, ok bool, err error)
-
-	// CloseWithContext is like Close, but passes in the provided context.
-	CloseWithContext(ctx context.Context) error
+	Close(ctx context.Context) error
 }
