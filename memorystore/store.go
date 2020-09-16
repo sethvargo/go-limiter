@@ -152,6 +152,24 @@ func (s *store) Set(ctx context.Context, key string, tokens uint64, interval tim
 	return nil
 }
 
+// Burst adds the provided value to the bucket's currently available tokens.
+func (s *store) Burst(ctx context.Context, key string, tokens uint64) error {
+	s.dataLock.Lock()
+	if b, ok := s.data[key]; ok {
+		b.lock.Lock()
+		s.dataLock.Unlock()
+		b.availableTokens = b.availableTokens + tokens
+		b.lock.Unlock()
+		return nil
+	}
+
+	// If we got this far, there's no current record for the key.
+	b := newBucket(s.tokens+tokens, s.interval)
+	s.data[key] = b
+	s.dataLock.Unlock()
+	return nil
+}
+
 // Close stops the memory limiter and cleans up any outstanding
 // sessions. You should always call Close() as it releases the memory consumed
 // by the map AND releases the tickers.

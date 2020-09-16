@@ -91,6 +91,30 @@ func TestStore_Exercise(t *testing.T) {
 			t.Errorf("expected %v to less than %v", got, want)
 		}
 	}
+
+	// Burst and take
+	{
+		if err := s.Burst(ctx, key, 5); err != nil {
+			t.Fatal(err)
+		}
+
+		limit, remaining, reset, ok, err := s.Take(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			t.Errorf("expected ok")
+		}
+		if got, want := limit, uint64(11); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+		if got, want := remaining, uint64(14); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+		if got, want := time.Until(time.Unix(0, int64(reset))), 5*time.Second; got > want {
+			t.Errorf("expected %v to less than %v", got, want)
+		}
+	}
 }
 
 func TestStore_Take(t *testing.T) {

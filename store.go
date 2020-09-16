@@ -42,6 +42,11 @@ type Store interface {
 	// limit.
 	Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error
 
+	// Burst adds more tokens to the key's current bucket until the next interval
+	// tick. This will allow the current bucket tick to exceed the maximum number
+	// maximum ticks until the next interval.
+	Burst(ctx context.Context, key string, tokens uint64) error
+
 	// Close terminates the store and cleans up any data structures or connections
 	// that may remain open. After a store is stopped, Take() should always return
 	// zero values.
