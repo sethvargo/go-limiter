@@ -45,6 +45,21 @@ func TestStore_Exercise(t *testing.T) {
 
 	key := testKey(t)
 
+	// Get when no config exists
+	{
+		limit, remaining, err := s.(*store).Get(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got, want := limit, uint64(0); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+		if got, want := remaining, uint64(0); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+	}
+
 	// Take with no key configuration - this should use the default values
 	{
 		limit, remaining, reset, ok, err := s.Take(ctx, key)
@@ -65,10 +80,38 @@ func TestStore_Exercise(t *testing.T) {
 		}
 	}
 
+	// Get the value
+	{
+		limit, remaining, err := s.(*store).Get(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := limit, uint64(5); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+		if got, want := remaining, uint64(4); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+	}
+
 	// Now set a value
 	{
 		if err := s.Set(ctx, key, 11, 5*time.Second); err != nil {
 			t.Fatal(err)
+		}
+	}
+
+	// Get the value again
+	{
+		limit, remaining, err := s.(*store).Get(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := limit, uint64(11); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+		if got, want := remaining, uint64(11); got != want {
+			t.Errorf("expected %v to be %v", got, want)
 		}
 	}
 
@@ -89,6 +132,20 @@ func TestStore_Exercise(t *testing.T) {
 		}
 		if got, want := time.Until(time.Unix(0, int64(reset))), 5*time.Second; got > want {
 			t.Errorf("expected %v to less than %v", got, want)
+		}
+	}
+
+	// Get the value again
+	{
+		limit, remaining, err := s.(*store).Get(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := limit, uint64(11); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+		if got, want := remaining, uint64(10); got != want {
+			t.Errorf("expected %v to be %v", got, want)
 		}
 	}
 
@@ -113,6 +170,20 @@ func TestStore_Exercise(t *testing.T) {
 		}
 		if got, want := time.Until(time.Unix(0, int64(reset))), 5*time.Second; got > want {
 			t.Errorf("expected %v to less than %v", got, want)
+		}
+	}
+
+	// Get the value one final time
+	{
+		limit, remaining, err := s.(*store).Get(ctx, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := limit, uint64(11); got != want {
+			t.Errorf("expected %v to be %v", got, want)
+		}
+		if got, want := remaining, uint64(14); got != want {
+			t.Errorf("expected %v to be %v", got, want)
 		}
 	}
 }

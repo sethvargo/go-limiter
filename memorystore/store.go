@@ -143,6 +143,25 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 	return b.take()
 }
 
+// Get retrieves the information about the key, if any exists.
+func (s *store) Get(ctx context.Context, key string) (uint64, uint64, error) {
+	// If the store is stopped, all requests are rejected.
+	if atomic.LoadUint32(&s.stopped) == 1 {
+		return 0, 0, limiter.ErrStopped
+	}
+
+	// Acquire a read lock first - this allows other to concurrently check limits
+	// without taking a full lock.
+	s.dataLock.RLock()
+	if b, ok := s.data[key]; ok {
+		s.dataLock.RUnlock()
+		return b.get()
+	}
+	s.dataLock.RUnlock()
+
+	return 0, 0, nil
+}
+
 // Set configures the bucket-specific tokens and interval.
 func (s *store) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error {
 	s.dataLock.Lock()
@@ -259,6 +278,16 @@ func newBucket(tokens uint64, interval time.Duration) *bucket {
 		fillRate:        float64(interval) / float64(tokens),
 	}
 	return b
+}
+
+// get returns information about the bucket.
+func (b *bucket) get() (tokens uint64, remaining uint64, retErr error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	tokens = b.maxTokens
+	remaining = b.availableTokens
+	return
 }
 
 // take attempts to remove a token from the bucket. If there are no tokens
