@@ -37,6 +37,10 @@ type Store interface {
 	// See the note about keys on the interface documentation.
 	Take(ctx context.Context, key string) (tokens, remaining, reset uint64, ok bool, err error)
 
+	// Get gets the current limit and remaining tokens for the provided key. It
+	// does not change any of the values.
+	Get(ctx context.Context, key string) (tokens, remaining uint64, err error)
+
 	// Set configures the limit at the provided key. If a limit already exists, it
 	// is overwritten. This also sets the number of tokens in the bucket to the
 	// limit.

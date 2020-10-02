@@ -22,6 +22,11 @@ func (s *store) Take(_ context.Context, _ string) (uint64, uint64, uint64, bool,
 	return 0, 0, 0, true, nil
 }
 
+// Get does nothing.
+func (s *store) Get(_ context.Context, _ string) (uint64, uint64, error) {
+	return 0, 0, nil
+}
+
 // Set does nothing.
 func (s *store) Set(_ context.Context, _ string, _ uint64, _ time.Duration) error {
 	return nil
