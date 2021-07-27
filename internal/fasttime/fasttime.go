@@ -8,12 +8,11 @@ import (
 )
 
 //go:noescape
-//go:linkname walltime runtime.walltime
-func walltime() (int64, int32)
+//go:linkname nanotime runtime.nanotime
+func nanotime() int64
 
 // Now returns a monotonic clock value. The actual value will differ across
 // systems, but that's okay because we generally only care about the deltas.
 func Now() uint64 {
-	x, y := walltime()
-	return uint64(x)*1e9 + uint64(y)
+	return uint64(nanotime())
 }
