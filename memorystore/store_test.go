@@ -13,18 +13,24 @@ import (
 )
 
 func TestFillRate(t *testing.T) {
-	s, _ := New(&Config{
-		Tokens:   65535,
-		Interval: time.Second,
-	})
+	t.Parallel()
 
-	for i := 0; i < 20; i++ {
-		limit, remaining, _, _, _ := s.Take(context.Background(), "asd")
-		if remaining < limit-uint64(i)-1 {
-			t.Errorf("invalid remaining: run: %d limit: %d remaining: %d", i, limit, remaining)
+	t.Run("many_tokens_small_interval", func(t *testing.T) {
+		t.Parallel()
+
+		s, _ := New(&Config{
+			Tokens:   65525,
+			Interval: time.Second,
+		})
+
+		for i := 0; i < 20; i++ {
+			limit, remaining, _, _, _ := s.Take(context.Background(), "key")
+			if remaining < limit-uint64(i)-1 {
+				t.Errorf("invalid remaining: run: %d limit: %d remaining: %d", i, limit, remaining)
+			}
+			time.Sleep(100 * time.Millisecond)
 		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	})
 }
 
 func testKey(tb testing.TB) string {
