@@ -12,6 +12,21 @@ import (
 	"github.com/sethvargo/go-limiter/internal/fasttime"
 )
 
+func TestFillRate(t *testing.T) {
+	s, _ := New(&Config{
+		Tokens:   65535,
+		Interval: time.Second,
+	})
+
+	for i := 0; i < 20; i++ {
+		limit, remaining, _, _, _ := s.Take(context.Background(), "asd")
+		if remaining < limit-uint64(i)-1 {
+			t.Errorf("invalid remaining: run: %d limit: %d remaining: %d", i, limit, remaining)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 func testKey(tb testing.TB) string {
 	tb.Helper()
 
@@ -372,56 +387,6 @@ func TestBucketedLimiter_tick(t *testing.T) {
 			t.Parallel()
 
 			if got, want := tick(tc.start, tc.curr, tc.interval), tc.exp; got != want {
-				t.Errorf("expected %v to be %v", got, want)
-			}
-		})
-	}
-}
-
-func TestBucketedLimiter_availableTokens(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name     string
-		last     uint64
-		curr     uint64
-		max      uint64
-		fillRate float64
-		exp      uint64
-	}{
-		{
-			name:     "zero",
-			last:     0,
-			curr:     0,
-			max:      1,
-			fillRate: 1.0,
-			exp:      0,
-		},
-		{
-			name:     "one",
-			last:     0,
-			curr:     1,
-			max:      1,
-			fillRate: 1.0,
-			exp:      1,
-		},
-		{
-			name:     "max",
-			last:     0,
-			curr:     5,
-			max:      2,
-			fillRate: 1.0,
-			exp:      2,
-		},
-	}
-
-	for _, tc := range cases {
-		tc := tc
-
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			if got, want := availableTokens(tc.last, tc.curr, tc.max, tc.fillRate), tc.exp; got != want {
 				t.Errorf("expected %v to be %v", got, want)
 			}
 		})

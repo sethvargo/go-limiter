@@ -253,10 +253,6 @@ type bucket struct {
 	// interval is the time at which ticking should occur.
 	interval time.Duration
 
-	// fillRate is the number of tokens to add per nanosecond. It is calculated
-	// based on the provided maxTokens and interval.
-	fillRate float64
-
 	// availableTokens is the current point-in-time number of tokens remaining.
 	availableTokens uint64
 
@@ -275,7 +271,6 @@ func newBucket(tokens uint64, interval time.Duration) *bucket {
 		maxTokens:       tokens,
 		availableTokens: tokens,
 		interval:        interval,
-		fillRate:        float64(interval) / float64(tokens),
 	}
 	return b
 }
@@ -304,8 +299,12 @@ func (b *bucket) take() (tokens uint64, remaining uint64, reset uint64, ok bool,
 	reset = b.startTime + ((currTick + 1) * uint64(b.interval))
 
 	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	// If we're on a new tick since last assessment, perform
+	// a full reset up to maxTokens.
 	if b.lastTick < currTick {
-		b.availableTokens = availableTokens(b.lastTick, currTick, b.maxTokens, b.fillRate)
+		b.availableTokens = b.maxTokens
 		b.lastTick = currTick
 	}
 
@@ -314,22 +313,8 @@ func (b *bucket) take() (tokens uint64, remaining uint64, reset uint64, ok bool,
 		ok = true
 		remaining = b.availableTokens
 	}
-	b.lock.Unlock()
 
 	return
-}
-
-// availableTokens returns the number of available tokens, up to max, between
-// the two ticks.
-func availableTokens(last, curr, max uint64, fillRate float64) uint64 {
-	delta := curr - last
-
-	available := uint64(float64(delta) * fillRate)
-	if available > max {
-		available = max
-	}
-
-	return available
 }
 
 // tick is the total number of times the current interval has occurred between
@@ -339,5 +324,5 @@ func availableTokens(last, curr, max uint64, fillRate float64) uint64 {
 // that tick would return 5 at 12:59pm, because it hasn't reached the 6th tick
 // yet.
 func tick(start, curr uint64, interval time.Duration) uint64 {
-	return (curr - start) / uint64(interval)
+	return (curr - start) / uint64(interval.Nanoseconds())
 }
