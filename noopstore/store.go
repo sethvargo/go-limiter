@@ -41,3 +41,28 @@ func (s *store) Burst(_ context.Context, _ string, _ uint64) error {
 func (s *store) Close(_ context.Context) error {
 	return nil
 }
+
+// Activate does nothing.
+func (s *store) Activate(_ string) {
+
+}
+
+// Deactivate does nothing.
+func (s *store) Deactivate(_ string) {
+
+}
+
+// IsActivate return false.
+func (s *store) IsActivate(_ string) bool {
+	return false
+}
+
+// GetStoreSize return 0
+func (s *store) GetStoreSize() int {
+	return 0
+}
+
+// GetStoreSize does nothing.
+func (s *store) ResetTokens(_ string) {
+
+}

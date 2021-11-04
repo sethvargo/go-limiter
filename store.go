@@ -55,4 +55,19 @@ type Store interface {
 	// that may remain open. After a store is stopped, Take() should always return
 	// zero values.
 	Close(ctx context.Context) error
+
+	// ResetTokens resets the number of available tokens in the bucket. Sets the maximum amount of tokens
+	ResetTokens(key string)
+
+	// Return active state for data[key] bucket.
+	IsActivate(key string) bool
+
+	// Set active = true for data[key] bucket.
+	Activate(key string)
+
+	// Set active = false for data[key] bucket.
+	Deactivate(key string)
+
+	// Return data map size
+	GetStoreSize() int
 }
