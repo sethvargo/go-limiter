@@ -209,6 +209,55 @@ func (s *store) Close(ctx context.Context) error {
 	return nil
 }
 
+// Set active to true for data[key] bucket.
+func (s *store) Activate(key string) {
+	s.dataLock.Lock()
+	if _, ok := s.data[key]; ok {
+		s.data[key].active = true
+	}
+	s.dataLock.Unlock()
+}
+
+// Set active to false for data[key] bucket.
+func (s *store) Deactivate(key string) {
+	s.dataLock.Lock()
+	if _, ok := s.data[key]; ok {
+		s.data[key].active = false
+	}
+	s.dataLock.Unlock()
+}
+
+// Return active state for data[key] bucket.
+func (s *store) IsActivate(key string) bool {
+
+	s.dataLock.RLock()
+	if data, ok := s.data[key]; ok {
+		s.dataLock.RUnlock()
+		return data.active
+	}
+	s.dataLock.RUnlock()
+
+	return true
+}
+
+// Return data size
+func (s *store) GetStoreSize() int {
+	s.dataLock.RLock()
+	storeSize := len(s.data)
+	s.dataLock.RUnlock()
+	return storeSize
+}
+
+// Reset tokens for key.
+func (s *store) ResetTokens(key string) {
+	s.dataLock.Lock()
+	if data, ok := s.data[key]; ok {
+		data.availableTokens = data.maxTokens
+		s.data[key] = data
+	}
+	s.dataLock.Unlock()
+}
+
 // purge continually iterates over the map and purges old values on the provided
 // sweep interval. Earlier designs used a go-function-per-item expiration, but
 // it actually generated *more* lock contention under normal use. The most
@@ -262,6 +311,9 @@ type bucket struct {
 
 	// lock guards the mutable fields.
 	lock sync.Mutex
+
+	// active flag
+	active bool
 }
 
 // newBucket creates a new bucket from the given tokens and interval.
@@ -271,6 +323,7 @@ func newBucket(tokens uint64, interval time.Duration) *bucket {
 		maxTokens:       tokens,
 		availableTokens: tokens,
 		interval:        interval,
+		active:          true,
 	}
 	return b
 }
