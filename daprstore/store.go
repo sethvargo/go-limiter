@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"os"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,10 +15,8 @@ import (
 	"github.com/sethvargo/go-limiter/internal/fasttime"
 )
 
-const (
-	stateStoreName = `statestore`
-	daprPort       = "3500"
-)
+const DEFAULT_DAPR_PORT = "3500"
+const DEFAULT_STATE_STORE_NAME = "statestore"
 
 var port string
 var _ limiter.Store = (*store)(nil)
@@ -27,7 +24,7 @@ var client dapr.Client
 
 func init() {
 	if port = os.Getenv("DAPR_GRPC_PORT"); len(port) == 0 {
-		port = daprPort
+		port = DEFAULT_DAPR_PORT
 	}
 	client, _ = dapr.NewClientWithPort(port)
 }
@@ -36,14 +33,10 @@ type store struct {
 	tokens   uint64
 	interval time.Duration
 
-	sweepInterval time.Duration
-	sweepMinTTL   uint64
-
-	client   dapr.Client
-	dataLock sync.RWMutex
-
-	stopped uint32
-	stopCh  chan struct{}
+	client         dapr.Client
+	stateStoreName string
+	stopped        uint32
+	stopCh         chan struct{}
 }
 
 // Config is used as input to New. It defines the behavior of the storage
@@ -56,11 +49,14 @@ type Config struct {
 	// Interval is the time interval upon which to enforce rate limiting. The
 	// default value is 1 second.
 	Interval time.Duration
+
+	// The name of the DAPR state store to be used for the distributed bucket
+	StateStoreName string
 }
 
-// New creates an in-memory rate limiter that uses a bucketing model to limit
-// the number of permitted events over an interval. It's optimized for runtime
-// and memory efficiency.
+// New creates a DAPR state rate limiter that uses a bucketing model to limit
+// the number of permitted events over an interval. All DAPR applications with the same app-id
+// can use the same bucket.
 func New(c *Config) (limiter.Store, error) {
 	if c == nil {
 		c = new(Config)
@@ -76,14 +72,18 @@ func New(c *Config) (limiter.Store, error) {
 		interval = c.Interval
 	}
 
-	s := &store{
-		tokens:        tokens,
-		interval:      interval,
-		sweepInterval: 6 * time.Hour,
-		client:        client,
-		stopCh:        make(chan struct{}),
+	stateStoreName := DEFAULT_STATE_STORE_NAME
+	if c.StateStoreName != "" {
+		stateStoreName = c.StateStoreName
 	}
-	go s.purge()
+
+	s := &store{
+		tokens:         tokens,
+		interval:       interval,
+		client:         client,
+		stateStoreName: stateStoreName,
+		stopCh:         make(chan struct{}),
+	}
 	return s, nil
 }
 
@@ -96,7 +96,7 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 		return 0, 0, 0, false, limiter.ErrStopped
 	}
 	// Get the current bucket, or create a new one if it doesn't exist.
-	item, err := client.GetStateWithConsistency(ctx, stateStoreName, key, nil, dapr.StateConsistencyStrong)
+	item, err := client.GetStateWithConsistency(ctx, s.stateStoreName, key, nil, dapr.StateConsistencyStrong)
 	if err != nil {
 		return 0, 0, 0, false, err
 	}
@@ -118,7 +118,7 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, b)
 
-	err = client.SaveStateWithETag(ctx, stateStoreName, key, buf.Bytes(), eTag, nil, dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite), dapr.WithConsistency(dapr.StateConsistencyStrong))
+	err = client.SaveStateWithETag(ctx, s.stateStoreName, key, buf.Bytes(), eTag, nil, dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite), dapr.WithConsistency(dapr.StateConsistencyStrong))
 	if err != nil {
 		if strings.Contains(err.Error(), "etag mismatch") {
 			// Server conflict so try it again
@@ -136,46 +136,70 @@ func (s *store) Get(ctx context.Context, key string) (uint64, uint64, error) {
 		return 0, 0, limiter.ErrStopped
 	}
 
-	// Acquire a read lock first - this allows other to concurrently check limits
-	// without taking a full lock.
-	s.dataLock.RLock()
-	// if b, ok := s.data[key]; ok {
-	// 	s.dataLock.RUnlock()
-	// 	return b.get()
-	// }
-	s.dataLock.RUnlock()
-
-	return 0, 0, nil
+	// Get the current bucket, or create a new one if it doesn't exist.
+	item, err := client.GetStateWithConsistency(ctx, s.stateStoreName, key, nil, dapr.StateConsistencyStrong)
+	if err != nil {
+		return 0, 0, err
+	}
+	var b Bucket
+	if item.Value == nil {
+		return 0, 0, nil
+	} else {
+		binary.Read(bytes.NewBuffer(item.Value), binary.BigEndian, &b)
+		return b.get()
+	}
 }
 
 // Set configures the bucket-specific tokens and interval.
 func (s *store) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error {
-	s.dataLock.Lock()
-	// b := newBucket(tokens, interval)
-	// s.data[key] = b
-	s.dataLock.Unlock()
+	b := newBucket(tokens, interval)
+	// Get the current bucket.
+	item, err := client.GetStateWithConsistency(ctx, s.stateStoreName, key, nil, dapr.StateConsistencyStrong)
+	if err == nil {
+		eTag := item.Etag
+		// Save the bucket
+		var buf bytes.Buffer
+		binary.Write(&buf, binary.BigEndian, b)
+
+		err = client.SaveStateWithETag(ctx, s.stateStoreName, key, buf.Bytes(), eTag, nil, dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite), dapr.WithConsistency(dapr.StateConsistencyStrong))
+		if err != nil {
+			if strings.Contains(err.Error(), "etag mismatch") {
+				// Server conflict so try it again
+				return s.Set(ctx, key, tokens, interval)
+			}
+		}
+	}
 	return nil
 }
 
 // Burst adds the provided value to the bucket's currently available tokens.
 func (s *store) Burst(ctx context.Context, key string, tokens uint64) error {
-	s.dataLock.Lock()
-	// if b, ok := s.data[key]; ok {
-	// 	b.lock.Lock()
-	// 	s.dataLock.Unlock()
-	// 	b.availableTokens = b.availableTokens + tokens
-	// 	b.lock.Unlock()
-	// 	return nil
-	// }
+	var b Bucket
+	// Get the current bucket.
+	item, err := client.GetStateWithConsistency(ctx, s.stateStoreName, key, nil, dapr.StateConsistencyStrong)
+	if err == nil {
+		eTag := item.Etag
+		if item.Value != nil {
+			binary.Read(bytes.NewBuffer(item.Value), binary.BigEndian, &b)
+		}
+		// Add tokens to the bucket.
+		b.AvailableTokens += tokens
+		// Save the bucket
+		var buf bytes.Buffer
+		binary.Write(&buf, binary.BigEndian, b)
 
-	// If we got this far, there's no current record for the key.
-	// b := newBucket(s.tokens+tokens, s.interval)
-	// s.data[key] = b
-	s.dataLock.Unlock()
+		err = client.SaveStateWithETag(ctx, s.stateStoreName, key, buf.Bytes(), eTag, nil, dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite), dapr.WithConsistency(dapr.StateConsistencyStrong))
+		if err != nil {
+			if strings.Contains(err.Error(), "etag mismatch") {
+				// Server conflict so try it again
+				return s.Burst(ctx, key, tokens)
+			}
+		}
+	}
 	return nil
 }
 
-// Close stops the memory limiter and cleans up any outstanding
+// Close stops the dapr limiter and cleans up any outstanding
 // sessions. You should always call Close() as it releases the memory consumed
 // by the map AND releases the tickers.
 func (s *store) Close(ctx context.Context) error {
@@ -189,37 +213,6 @@ func (s *store) Close(ctx context.Context) error {
 	// Delete all the things.
 
 	return nil
-}
-
-// purge continually iterates over the map and purges old values on the provided
-// sweep interval. Earlier designs used a go-function-per-item expiration, but
-// it actually generated *more* lock contention under normal use. The most
-// performant option with real-world data was a global garbage collection on a
-// fixed interval.
-func (s *store) purge() {
-	ticker := time.NewTicker(s.sweepInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-s.stopCh:
-			return
-		case <-ticker.C:
-		}
-
-		s.dataLock.Lock()
-		// now := fasttime.Now()
-		// for k, b := range s.data {
-		// 	b.lock.Lock()
-		// 	lastTime := b.startTime + (b.lastTick * uint64(b.interval))
-		// 	b.lock.Unlock()
-
-		// 	if now-lastTime > s.sweepMinTTL {
-		// 		delete(s.data, k)
-		// 	}
-		// }
-		s.dataLock.Unlock()
-	}
 }
 
 // Bucket is an internal wrapper around a taker.
@@ -241,9 +234,6 @@ type Bucket struct {
 	// LastTick is the last clock tick, used to re-calculate the number of tokens
 	// on the bucket.
 	LastTick uint64
-
-	// Lock guards the mutable fields.
-	// Lock sync.Mutex
 }
 
 // newBucket creates a new bucket from the given tokens and interval.

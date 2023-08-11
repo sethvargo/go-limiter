@@ -16,6 +16,10 @@ func main() {
 
 		// Interval until tokens reset.
 		Interval: time.Second * 1,
+
+		// The name of the DAPR state store to be used for the distributed bucket
+		// Default value is "statestore"
+		StateStoreName: "statestore",
 	})
 
 	if err != nil {
