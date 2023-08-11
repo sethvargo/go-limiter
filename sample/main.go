@@ -6,17 +6,18 @@ import (
 	"log"
 	"time"
 
-	"github.com/sethvargo/go-limiter/memorystore"
+	"github.com/sethvargo/go-limiter/daprstore"
 )
 
 func main() {
-	store, err := memorystore.New(&memorystore.Config{
+	store, err := daprstore.New(&daprstore.Config{
 		// Number of tokens allowed per interval.
-		Tokens: 15,
+		Tokens: 1,
 
 		// Interval until tokens reset.
-		Interval: time.Second * 5,
+		Interval: time.Second * 1,
 	})
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -27,16 +28,19 @@ func main() {
 	// MAC address.
 	key := "127.0.0.1"
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 50; i++ {
 		// Take a token.
 		tokens, remaining, reset, ok, err := store.Take(ctx, key)
-		if (!ok && remaining == 0) || err != nil {
+		for (!ok && remaining == 0) || err != nil {
+			if err != nil {
+				break
+			}
 			// Rate limit exceeded.
 			tokenAvailableTime := time.Unix(0, int64(reset))
-			fmt.Println("Rate limit exceeded - waiting until", tokenAvailableTime)
+			//fmt.Println("Rate limit exceeded - waiting until", tokenAvailableTime)
 			time.Sleep(time.Until(tokenAvailableTime))
 			tokens, remaining, reset, ok, err = store.Take(ctx, key)
 		}
-		fmt.Println(tokens, remaining, reset, ok, err)
+		fmt.Println(i, tokens, remaining, reset, ok, err)
 	}
 }

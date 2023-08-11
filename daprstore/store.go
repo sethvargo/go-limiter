@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/binary"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -76,11 +77,11 @@ func New(c *Config) (limiter.Store, error) {
 	}
 
 	s := &store{
-		tokens:   tokens,
-		interval: interval,
-
-		client: client,
-		stopCh: make(chan struct{}),
+		tokens:        tokens,
+		interval:      interval,
+		sweepInterval: 6 * time.Hour,
+		client:        client,
+		stopCh:        make(chan struct{}),
 	}
 	go s.purge()
 	return s, nil
@@ -94,31 +95,38 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 	if atomic.LoadUint32(&s.stopped) == 1 {
 		return 0, 0, 0, false, limiter.ErrStopped
 	}
-
-	item, err := client.GetState(ctx, stateStoreName, key, nil)
+	// Get the current bucket, or create a new one if it doesn't exist.
+	item, err := client.GetStateWithConsistency(ctx, stateStoreName, key, nil, dapr.StateConsistencyEventual)
 	if err != nil {
 		return 0, 0, 0, false, err
 	}
+	var b Bucket
 	eTag := item.Etag
-	b := bucket{}
-	binary.Read(bytes.NewBuffer(item.Value), binary.BigEndian, &b)
-	b.take()
-	binary.Write(bytes.NewBuffer(item.Value), binary.BigEndian, &b)
-	stateOptions := dapr.StateOptions{
-		Concurrency: dapr.StateConcurrencyFirstWrite,
-		Consistency: dapr.StateConsistencyEventual,
+	if item.Value == nil {
+		b = *newBucket(s.tokens, s.interval)
+	} else {
+		binary.Read(bytes.NewBuffer(item.Value), binary.BigEndian, &b)
 	}
-	eTag2 := dapr.ETag{Value: eTag}
-	item2 := &dapr.SetStateItem{
-		Key:     item.Key,
-		Value:   item.Value,
-		Etag:    &eTag2,
-		Options: &stateOptions}
-	err = client.SaveBulkState(ctx, stateStoreName, item2)
+
+	// Take a token from the bucket.
+	tokens, remaining, reset, ok, err := b.take()
 	if err != nil {
 		return 0, 0, 0, false, err
 	}
-	return b.maxTokens, b.availableTokens, b.lastTick, true, nil
+
+	// Save the bucket
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, b)
+
+	err = client.SaveStateWithETag(ctx, stateStoreName, key, buf.Bytes(), eTag, nil, dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite), dapr.WithConsistency(dapr.StateConsistencyStrong))
+	if err != nil {
+		if strings.Contains(err.Error(), "etag mismatch") {
+			// Server conflict so try it again
+			return s.Take(ctx, key)
+		}
+		return 0, 0, 0, false, err
+	}
+	return tokens, remaining, reset, ok, nil
 }
 
 // Get retrieves the information about the key, if any exists.
@@ -214,48 +222,48 @@ func (s *store) purge() {
 	}
 }
 
-// bucket is an internal wrapper around a taker.
-type bucket struct {
-	// startTime is the number of nanoseconds from unix epoch when this bucket was
+// Bucket is an internal wrapper around a taker.
+type Bucket struct {
+	// StartTime is the number of nanoseconds from unix epoch when this bucket was
 	// initially created.
-	startTime uint64
+	StartTime uint64
 
-	// maxTokens is the maximum number of tokens permitted on the bucket at any
+	// MaxTokens is the maximum number of tokens permitted on the bucket at any
 	// time. The number of available tokens will never exceed this value.
-	maxTokens uint64
+	MaxTokens uint64
 
-	// interval is the time at which ticking should occur.
-	interval time.Duration
+	// Interval is the time at which ticking should occur.
+	Interval time.Duration
 
-	// availableTokens is the current point-in-time number of tokens remaining.
-	availableTokens uint64
+	// AvailableTokens is the current point-in-time number of tokens remaining.
+	AvailableTokens uint64
 
-	// lastTick is the last clock tick, used to re-calculate the number of tokens
+	// LastTick is the last clock tick, used to re-calculate the number of tokens
 	// on the bucket.
-	lastTick uint64
+	LastTick uint64
 
-	// lock guards the mutable fields.
-	lock sync.Mutex
+	// Lock guards the mutable fields.
+	// Lock sync.Mutex
 }
 
 // newBucket creates a new bucket from the given tokens and interval.
-func newBucket(tokens uint64, interval time.Duration) *bucket {
-	b := &bucket{
-		startTime:       fasttime.Now(),
-		maxTokens:       tokens,
-		availableTokens: tokens,
-		interval:        interval,
+func newBucket(tokens uint64, interval time.Duration) *Bucket {
+	b := &Bucket{
+		StartTime:       fasttime.Now(),
+		MaxTokens:       tokens,
+		AvailableTokens: tokens,
+		Interval:        interval,
 	}
 	return b
 }
 
 // get returns information about the bucket.
-func (b *bucket) get() (tokens uint64, remaining uint64, retErr error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+func (b *Bucket) get() (tokens uint64, remaining uint64, retErr error) {
+	//b.Lock.Lock()
+	//defer b.Lock.Unlock()
 
-	tokens = b.maxTokens
-	remaining = b.availableTokens
+	tokens = b.MaxTokens
+	remaining = b.AvailableTokens
 	return
 }
 
@@ -263,29 +271,29 @@ func (b *bucket) get() (tokens uint64, remaining uint64, retErr error) {
 // available and the clock has ticked forward, it recalculates the number of
 // tokens and retries. It returns the limit, remaining tokens, time until
 // refresh, and whether the take was successful.
-func (b *bucket) take() (tokens uint64, remaining uint64, reset uint64, ok bool, retErr error) {
+func (b *Bucket) take() (tokens uint64, remaining uint64, reset uint64, ok bool, retErr error) {
 	// Capture the current request time, current tick, and amount of time until
 	// the bucket resets.
 	now := fasttime.Now()
-	currTick := tick(b.startTime, now, b.interval)
+	currTick := tick(b.StartTime, now, b.Interval)
 
-	tokens = b.maxTokens
-	reset = b.startTime + ((currTick + 1) * uint64(b.interval))
+	tokens = b.MaxTokens
+	reset = b.StartTime + ((currTick + 1) * uint64(b.Interval))
 
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	//b.Lock.Lock()
+	//defer b.Lock.Unlock()
 
 	// If we're on a new tick since last assessment, perform
 	// a full reset up to maxTokens.
-	if b.lastTick < currTick {
-		b.availableTokens = b.maxTokens
-		b.lastTick = currTick
+	if b.LastTick < currTick {
+		b.AvailableTokens = b.MaxTokens
+		b.LastTick = currTick
 	}
 
-	if b.availableTokens > 0 {
-		b.availableTokens--
+	if b.AvailableTokens > 0 {
+		b.AvailableTokens--
 		ok = true
-		remaining = b.availableTokens
+		remaining = b.AvailableTokens
 	}
 
 	return
