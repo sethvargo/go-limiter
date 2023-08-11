@@ -41,6 +41,8 @@ func main() {
 			time.Sleep(time.Until(tokenAvailableTime))
 			tokens, remaining, reset, ok, err = store.Take(ctx, key)
 		}
+		// Normally we'd do something with the tokens, like make an API call to the URL defined in 'key' above.
+		// For this example, we'll just print them.
 		fmt.Println(i, tokens, remaining, reset, ok, err)
 	}
 }
