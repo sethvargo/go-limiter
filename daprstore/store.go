@@ -96,7 +96,7 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 		return 0, 0, 0, false, limiter.ErrStopped
 	}
 	// Get the current bucket, or create a new one if it doesn't exist.
-	item, err := client.GetStateWithConsistency(ctx, stateStoreName, key, nil, dapr.StateConsistencyEventual)
+	item, err := client.GetStateWithConsistency(ctx, stateStoreName, key, nil, dapr.StateConsistencyStrong)
 	if err != nil {
 		return 0, 0, 0, false, err
 	}
