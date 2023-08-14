@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -32,6 +33,7 @@ func init() {
 type store struct {
 	tokens   uint64
 	interval time.Duration
+	dataLock sync.RWMutex
 
 	client         dapr.Client
 	stateStoreName string
@@ -95,6 +97,8 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 	if atomic.LoadUint32(&s.stopped) == 1 {
 		return 0, 0, 0, false, limiter.ErrStopped
 	}
+	s.dataLock.Lock()
+	defer s.dataLock.Unlock()
 	// Get the current bucket, or create a new one if it doesn't exist.
 	item, err := client.GetStateWithConsistency(ctx, s.stateStoreName, key, nil, dapr.StateConsistencyStrong)
 	if err != nil {
@@ -117,8 +121,13 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 	// Save the bucket
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, b)
+	err = client.SaveStateWithETag(ctx, s.stateStoreName,
+		key,
+		buf.Bytes(),
+		eTag, nil,
+		dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite),
+		dapr.WithConsistency(dapr.StateConsistencyStrong))
 
-	err = client.SaveStateWithETag(ctx, s.stateStoreName, key, buf.Bytes(), eTag, nil, dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite), dapr.WithConsistency(dapr.StateConsistencyStrong))
 	if err != nil {
 		if strings.Contains(err.Error(), "etag mismatch") {
 			// Server conflict so try it again
@@ -135,7 +144,8 @@ func (s *store) Get(ctx context.Context, key string) (uint64, uint64, error) {
 	if atomic.LoadUint32(&s.stopped) == 1 {
 		return 0, 0, limiter.ErrStopped
 	}
-
+	s.dataLock.RLock()
+	defer s.dataLock.RUnlock()
 	// Get the current bucket, or create a new one if it doesn't exist.
 	item, err := client.GetStateWithConsistency(ctx, s.stateStoreName, key, nil, dapr.StateConsistencyStrong)
 	if err != nil {
@@ -153,6 +163,8 @@ func (s *store) Get(ctx context.Context, key string) (uint64, uint64, error) {
 // Set configures the bucket-specific tokens and interval.
 func (s *store) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error {
 	b := newBucket(tokens, interval)
+	s.dataLock.Lock()
+	defer s.dataLock.Unlock()
 	// Get the current bucket.
 	item, err := client.GetStateWithConsistency(ctx, s.stateStoreName, key, nil, dapr.StateConsistencyStrong)
 	if err == nil {
@@ -160,8 +172,14 @@ func (s *store) Set(ctx context.Context, key string, tokens uint64, interval tim
 		// Save the bucket
 		var buf bytes.Buffer
 		binary.Write(&buf, binary.BigEndian, b)
+		err = client.SaveStateWithETag(ctx,
+			s.stateStoreName,
+			key, buf.Bytes(),
+			eTag,
+			nil,
+			dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite),
+			dapr.WithConsistency(dapr.StateConsistencyStrong))
 
-		err = client.SaveStateWithETag(ctx, s.stateStoreName, key, buf.Bytes(), eTag, nil, dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite), dapr.WithConsistency(dapr.StateConsistencyStrong))
 		if err != nil {
 			if strings.Contains(err.Error(), "etag mismatch") {
 				// Server conflict so try it again
@@ -175,6 +193,8 @@ func (s *store) Set(ctx context.Context, key string, tokens uint64, interval tim
 // Burst adds the provided value to the bucket's currently available tokens.
 func (s *store) Burst(ctx context.Context, key string, tokens uint64) error {
 	var b Bucket
+	s.dataLock.Lock()
+	defer s.dataLock.Unlock()
 	// Get the current bucket.
 	item, err := client.GetStateWithConsistency(ctx, s.stateStoreName, key, nil, dapr.StateConsistencyStrong)
 	if err == nil {
@@ -187,8 +207,15 @@ func (s *store) Burst(ctx context.Context, key string, tokens uint64) error {
 		// Save the bucket
 		var buf bytes.Buffer
 		binary.Write(&buf, binary.BigEndian, b)
+		err = client.SaveStateWithETag(ctx,
+			s.stateStoreName,
+			key,
+			buf.Bytes(),
+			eTag,
+			nil,
+			dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite),
+			dapr.WithConsistency(dapr.StateConsistencyStrong))
 
-		err = client.SaveStateWithETag(ctx, s.stateStoreName, key, buf.Bytes(), eTag, nil, dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite), dapr.WithConsistency(dapr.StateConsistencyStrong))
 		if err != nil {
 			if strings.Contains(err.Error(), "etag mismatch") {
 				// Server conflict so try it again
