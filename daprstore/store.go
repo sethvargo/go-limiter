@@ -98,10 +98,10 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 		return 0, 0, 0, false, limiter.ErrStopped
 	}
 	s.dataLock.Lock()
-	defer s.dataLock.Unlock()
 	// Get the current bucket, or create a new one if it doesn't exist.
 	item, err := client.GetStateWithConsistency(ctx, s.stateStoreName, key, nil, dapr.StateConsistencyStrong)
 	if err != nil {
+		s.dataLock.Unlock()
 		return 0, 0, 0, false, err
 	}
 	var b Bucket
@@ -115,6 +115,7 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 	// Take a token from the bucket.
 	tokens, remaining, reset, ok, err := b.take()
 	if err != nil {
+		s.dataLock.Unlock()
 		return 0, 0, 0, false, err
 	}
 
@@ -130,11 +131,14 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 
 	if err != nil {
 		if strings.Contains(err.Error(), "etag mismatch") {
+			s.dataLock.Unlock()
 			// Server conflict so try it again
 			return s.Take(ctx, key)
 		}
+		s.dataLock.Unlock()
 		return 0, 0, 0, false, err
 	}
+	s.dataLock.Unlock()
 	return tokens, remaining, reset, ok, nil
 }
 
