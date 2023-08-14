@@ -1,4 +1,4 @@
-<mxfile host="Electron" modified="2023-08-14T15:20:25.628Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/21.6.8 Chrome/114.0.5735.289 Electron/25.5.0 Safari/537.36" etag="dkUCRf7CpuM0zgPaEprM" version="21.6.8" type="device">
+<mxfile host="Electron" modified="2023-08-14T15:39:33.554Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/21.6.8 Chrome/114.0.5735.289 Electron/25.5.0 Safari/537.36" etag="Q-U8jLKqkUEadDIBLfPg" version="21.6.8" type="device">
   <diagram name="Page-1" id="Lwo87rwQc3eSiiatt3BT">
     <mxGraphModel dx="1354" dy="735" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
@@ -24,9 +24,6 @@
         </mxCell>
         <mxCell id="mRTvDrS2cG5sLHKsbXgX-12" value="" style="dashed=0;outlineConnect=0;html=1;align=center;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.webicons.java;gradientColor=#DFDEDE;fontSize=13;" vertex="1" parent="1">
           <mxGeometry x="779" y="822" width="34" height="33.4" as="geometry" />
-        </mxCell>
-        <mxCell id="mRTvDrS2cG5sLHKsbXgX-13" value="&lt;span style=&quot;font-size: 13px;&quot;&gt;Create HSA Account&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=16;" vertex="1" parent="1">
-          <mxGeometry x="675" y="964" width="140" height="30" as="geometry" />
         </mxCell>
         <mxCell id="mRTvDrS2cG5sLHKsbXgX-14" value="Resiliency" style="edgeStyle=none;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=13;startSize=8;endSize=8;" edge="1" parent="1" source="mRTvDrS2cG5sLHKsbXgX-15">
           <mxGeometry relative="1" as="geometry">

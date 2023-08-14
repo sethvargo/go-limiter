@@ -87,4 +87,4 @@ spec:
 
 The DAPR HTTP Binding implementation would have to be extended to call the rate-limiting library to check if there are enough tokens for the call and if not, wait for some period of time before attempting to get another token. One area of integration would be the [Invoke](https://github.com/dapr/components-contrib/blob/master/bindings/http/http.go#L222) method in the HTTP binding. 
 
-![DAPR HTTP Binding](dapr-design.drawio.png)
+![DAPR HTTP Binding](dapr-http-binding.png)
