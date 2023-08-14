@@ -6,17 +6,21 @@ DAPR has a convenient HTTP binding that allows you to invoke any REST endpoint f
 
 While this sample shows the how to integrate rate-limiting with DAPR state so that you can implement a distributed rate-limiting solution, this approach would have to be implemented into the [DAPR HTTP](https://github.com/dapr/components-contrib/tree/master/bindings/http) binding itself to be truly useful. 
 
-## Running the sampke
+## daprstore implementation
 
-An existing rate-limiting library was extended to support distributed rate-limiting using DAPR state. The library was interesting because it allowed multiple stores to be implemented to store the token bucket that is used for the rate-limiting. Out-of-the-box a memory store and no-op store are implemented. Based on the memory store implementation, a DAPR state store was implemented. The DAPR state store is implemented in the [daprstore](../daprstore) directory.
+An existing rate-limiting library (in golang) was extended to support distributed rate-limiting using DAPR state. This library was interesting because it allowed multiple stores to be implemented to store the token bucket that is used for the rate-limiting. Out-of-the-box, a memory store and a no-op store are implemented. Based on the memory store implementation, a DAPR state store was implemented. The DAPR state store is implemented in the [daprstore](../daprstore) directory.
 
-The contents of the token buket are preserved in DAPR state and if there are any server-side conflicts (due to eTag mismatch for example) they are resolved by retrying the operation until the bucket state is consistent.
+The contents of the token buket are preserved in DAPR state and if there are any server-side conflicts (due to eTag mismatch for example) they are resolved by retrying the operation until the bucket state is consistent. A mutex is used to manage in-process concurrency of the token bucket state to avoid multiple writes to the DAPR state store from the same process.
+
+All of the existing test cases for the rate-limiting library (memorystore) were run against the DAPR state store implementation and they all passed.
+
+## Running the sample
 
 To run the sample, you need to have DAPR installed and running. You also need to have a DAPR state store configured. The sample uses the Redis state store. It is also recommended that you use a Redis state store in production since the token bucket algorithm is heavy on read-write operations and Redis is very fast at this.
 
 ### Simple use-case
 
-Execute the ./runsample.sh script to run the sample. The script will start the DAPR sidecar and then compile and run the main.go sample. This sample will setup a token bucket of 1 token per second and attempt to take 50 tokens sequentially from the bucket. The rate-limiter will ensure that only 1 token is taken per second. The output of the sample will look like this:
+Execute the ./runsample.sh script to run the sample. The script will start the DAPR sidecar and then compile and run the main.go file. This sample will setup a token bucket of 1 token per second and attempt to take 50 tokens sequentially from the bucket. The rate-limiter will ensure that only 1 token is taken per second. The output of the sample will look like this:
 
 ```bash
 ℹ️  Checking if Dapr sidecar is listening on GRPC port 62533
@@ -42,14 +46,17 @@ Execute the ./runsample.sh script to run the sample. The script will start the D
 == APP == 13 1 0 1692018383842265000 true <nil>
 ...
 ```
+You will notice that the tokens are consumed at about 1 per second.
 
 ### Distributed use-case
 
-Re-run the ./runsample.sh sceipt in a terminal window and while it it is running, open another terminal window and run the ./runsample2.sh script. This will start another instance of the sample application. The sample application will now attempt to take 50 tokens from the token bucket, but this time it will do so in co-ordination with the other instance. You will notice the outout of each terminal window is interleaved as the two instances of the sample application take turns taking tokens from the bucket. 
+Re-run the ./runsample.sh sceipt in a terminal window and while it it is running, open another terminal window and run the ./runsample2.sh script. This will start another instance of the sample application. The sample application will now also attempt to take 50 tokens from the token bucket, but this time it will do so in co-ordination with the other instance. You will notice the outout of each terminal window is interleaved as the two instances of the sample application take turns taking tokens from the bucket. 
 
-> Both applications must use the same DAPR app-id in order to share the same state.
+> Both applications must use the same DAPR *app-id* in order to share the same state.
 
 > Noteworthy is that the two applications don't interleave exactly on a token-by-token basis. This is because the token bucket algorithm is not deterministic. It is possible that one application will take multiple tokens in a row before the other application gets a chance to take a token.
+
+> Instead of a token-bucket algorithmm, a leaky-bucket algorithm could be used to ensure that the two applications take turns taking tokens from the bucket. This would be a good enhancement to the library.
 
 ## Integration with HTTP Binding
 
@@ -78,6 +85,6 @@ spec:
       value: "redis-rate-limit"
 ```
 
-The HTTP Binding implementation would have to be extended to call the rate-,miting library to check if there are enough tokens for the call and if not, wait for some period of time before attempting to get another token. One area of integration would be the [Invoke](https://github.com/dapr/components-contrib/blob/master/bindings/http/http.go#L222) in the HTTP binding. 
+The DAPR HTTP Binding implementation would have to be extended to call the rate-limiting library to check if there are enough tokens for the call and if not, wait for some period of time before attempting to get another token. One area of integration would be the [Invoke](https://github.com/dapr/components-contrib/blob/master/bindings/http/http.go#L222) method in the HTTP binding. 
 
 ![DAPR HTTP Binding](dapr-design.drawio.png)
