@@ -4,7 +4,7 @@
 
 DAPR has a convenient HTTP binding that allows you to invoke any REST endpoint from your application. This is useful for integrating with external services, such as Twilio, SendGrid, or any other service that exposes a REST API. However, many of these services have rate limits, and you need to be able to handle these rate limits in your application. Currently the DAPR HTTP binding does not provide a way to handle rate limits, so you need to implement this yourself. This sample shows how to do that using an available rate-limiting library in Golang.
 
-While this sample shows the how to integrate rate-limiting with DAPR state so that you can implement a distributed rate-limiting solution, this approach would have to be implemented into the [DAPR HTTP](https://github.com/dapr/components-contrib/tree/master/bindings/http) binding itself to be truly useful. 
+While this sample shows the how to integrate rate-limiting with DAPR state so that you can implement a distributed rate-limiting solution, this approach would have to be implemented into the DAPR runtime to be truly useful.
 
 ## daprstore implementation
 
@@ -58,7 +58,9 @@ Re-run the ./runsample.sh sceipt in a terminal window and while it it is running
 
 > Instead of a token-bucket algorithmm, a leaky-bucket algorithm could be used to ensure that the two applications take turns taking tokens from the bucket. This would be a good enhancement to the library.
 
-## Integration with HTTP Binding
+## Integration with DAPR Runtime
+
+### HTTP Binding 
 
 Proposed binding configuration metadata changes would add the following configuration options to the HTTP binding:
 
@@ -88,3 +90,11 @@ spec:
 The DAPR HTTP Binding implementation would have to be extended to call the rate-limiting library to check if there are enough tokens for the call and if not, wait for some period of time before attempting to get another token. One area of integration would be the [Invoke](https://github.com/dapr/components-contrib/blob/master/bindings/http/http.go#L222) method in the HTTP binding. 
 
 ![DAPR HTTP Binding](dapr-http-binding.png)
+
+### Service Bus Binding
+
+The Azure Servive Bus binding in DAPR provides a fixed rate of messages per second (as defined by the [maxActiveMessages](https://v1-9.docs.dapr.io/reference/components-reference/supported-pubsub/setup-azure-servicebus/) setting). The rate-limiting library could be used to implement dynamic flow-control for the Service Bus binding. The Service Bus binding would have to be extended to call the rate-limiting library to check if there are enough tokens for the next message and if not, wait for some period of time before attempting to get another token. 
+
+### Other Bindings
+
+In a similar way, other bindings may benefit from the Token Bucket algorithm to the control flow if execution.
