@@ -97,4 +97,4 @@ The Azure Servive Bus binding in DAPR provides a fixed rate of messages per seco
 
 ### Other Bindings
 
-In a similar way, other bindings may benefit from the Token Bucket algorithm to the control flow if execution.
+In a similar way, other bindings may benefit from the Token Bucket algorithm to the control flow of execution. Any of the Pub/Sub message brokers and bindings can be extended to use the Token Bucket algorithm to control the flow of messages, so if there is a common flow in the code that is used by all of the bindings, it would be better to implement the Token Bucket algorithm in that common flow.
