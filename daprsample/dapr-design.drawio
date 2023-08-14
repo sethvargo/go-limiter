@@ -1,0 +1,59 @@
+<mxfile host="Electron" modified="2023-08-14T15:20:25.628Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/21.6.8 Chrome/114.0.5735.289 Electron/25.5.0 Safari/537.36" etag="dkUCRf7CpuM0zgPaEprM" version="21.6.8" type="device">
+  <diagram name="Page-1" id="Lwo87rwQc3eSiiatt3BT">
+    <mxGraphModel dx="1354" dy="735" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="mRTvDrS2cG5sLHKsbXgX-6" target="mRTvDrS2cG5sLHKsbXgX-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-6" value="" style="whiteSpace=wrap;html=1;aspect=fixed;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="142" y="819" width="150" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-8" value="Go &lt;br&gt;Routine 1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="168" y="834" width="14" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-9" value="Go &lt;br&gt;Routine 2" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="206.5" y="898" width="14" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-10" value="Go&lt;br&gt;Routine 3" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="250" y="848" width="14" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-11" value="Legacy API" style="whiteSpace=wrap;html=1;aspect=fixed;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="669" y="817.94" width="147" height="147" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-12" value="" style="dashed=0;outlineConnect=0;html=1;align=center;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.webicons.java;gradientColor=#DFDEDE;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="779" y="822" width="34" height="33.4" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-13" value="&lt;span style=&quot;font-size: 13px;&quot;&gt;Create HSA Account&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="675" y="964" width="140" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-14" value="Resiliency" style="edgeStyle=none;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=13;startSize=8;endSize=8;" edge="1" parent="1" source="mRTvDrS2cG5sLHKsbXgX-15">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="667.666748046875" y="894" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="mRTvDrS2cG5sLHKsbXgX-15" target="mRTvDrS2cG5sLHKsbXgX-19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-15" value="&lt;span style=&quot;font-size: 13px;&quot;&gt;HTTP Binding&lt;/span&gt;" style="whiteSpace=wrap;html=1;aspect=fixed;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="430" y="844.5" width="99" height="99" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-16" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://nillsf.com/wp-content/uploads/2020/04/2020-04-26-11_44_08--750x410.png;" vertex="1" parent="1">
+          <mxGeometry x="518" y="848" width="35.92" height="19.62" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-18" style="edgeStyle=none;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=13;startSize=8;endSize=8;" edge="1" parent="1" source="mRTvDrS2cG5sLHKsbXgX-19">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="374" y="643.94" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-19" value="Rate-limiting library" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.bucket_with_objects;fillColor=#E05243;gradientColor=none;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="476" y="614.94" width="60" height="61.5" as="geometry" />
+        </mxCell>
+        <mxCell id="mRTvDrS2cG5sLHKsbXgX-20" value="Token-Bucket State" style="sketch=0;aspect=fixed;html=1;points=[];align=center;image;fontSize=12;image=img/lib/mscae/Cache_Redis_Product.svg;" vertex="1" parent="1">
+          <mxGeometry x="322" y="612.94" width="50" height="42" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
