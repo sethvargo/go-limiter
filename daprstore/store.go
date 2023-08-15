@@ -16,7 +16,6 @@ import (
 	"github.com/sethvargo/go-limiter/internal/fasttime"
 )
 
-const DEFAULT_DAPR_PORT = "3500"
 const DEFAULT_STATE_STORE_NAME = "statestore"
 
 var port string
@@ -25,7 +24,7 @@ var client dapr.Client
 
 func init() {
 	if port = os.Getenv("DAPR_GRPC_PORT"); len(port) == 0 {
-		port = DEFAULT_DAPR_PORT
+		panic("DAPR_GRPC_PORT environment variable not set")
 	}
 	client, _ = dapr.NewClientWithPort(port)
 }
