@@ -106,8 +106,10 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 	var b Bucket
 	eTag := item.Etag
 	if item.Value == nil {
+		// Create a new bucket since one does not exist.
 		b = *newBucket(s.tokens, s.interval)
 	} else {
+		// Deserialize existing bucket
 		binary.Read(bytes.NewBuffer(item.Value), binary.BigEndian, &b)
 	}
 
@@ -120,7 +122,9 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 
 	// Save the bucket
 	var buf bytes.Buffer
+	// Seralize bucket to bytes
 	binary.Write(&buf, binary.BigEndian, b)
+	// Save bucket state
 	err = client.SaveStateWithETag(ctx, s.stateStoreName,
 		key,
 		buf.Bytes(),
@@ -128,6 +132,7 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 		dapr.WithConcurrency(dapr.StateConcurrencyFirstWrite),
 		dapr.WithConsistency(dapr.StateConsistencyStrong))
 
+	// Retry if eTag mismatch
 	if err != nil {
 		if strings.Contains(err.Error(), "etag mismatch") {
 			s.dataLock.Unlock()
