@@ -14,6 +14,22 @@ The contents of the token buket are preserved in DAPR state and if there are any
 
 All of the existing test cases for the rate-limiting library (memorystore) were run against the DAPR state store implementation and they all passed.
 
+### Running the tests
+
+The tests are located in the *daprstore* folder and can be executed as follows:
+
+```bash
+./runtest.sh
+```
+
+This will executed the same set of tests that were developed for the *memorystore* against the daprstore. The output of the tests will produce verbose results and eventually display a PASS message like this:
+
+```bash
+...
+== APP == PASS
+== APP == ok  	github.com/sethvargo/go-limiter/daprstore	2.157s
+```
+
 ## Running the sample
 
 To run the sample, you need to have DAPR installed and running. You also need to have a DAPR state store configured. The sample uses the Redis state store. It is also recommended that you use a Redis state store in production since the token bucket algorithm is heavy on read-write operations and Redis is very fast at this.
