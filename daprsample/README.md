@@ -10,7 +10,7 @@ While this sample shows how to implement rate-limiting using DAPR State to store
 
 This existing rate-limiting library was extended to support distributed rate-limiting using DAPR state. This library was interesting because it allowed multiple stores to be implemented to store the token bucket that is used for the rate-limiting. Out-of-the-box, a memory store and a no-op store are implemented. Based on the memory store implementation, a DAPR state store was implemented. The DAPR state store is implemented in the [daprstore](../daprstore) directory.
 
-The contents of the token buket are preserved in DAPR state and if there are any server-side conflicts (due to eTag mismatch for example) they are resolved by retrying the operation until the bucket state is consistent. A mutex is used to manage in-process concurrency of the token bucket state to avoid multiple writes to the DAPR state store from the same process.
+The contents of the token bucket are preserved in DAPR state and if there are any server-side conflicts (due to eTag mismatch for example) they are resolved by retrying the operation until the bucket state is consistent. A mutex is used to manage in-process concurrency of the token bucket state to avoid multiple writes to the DAPR state store from the same process.
 
 All of the existing test cases for the rate-limiting library (memorystore) were run against the DAPR state store implementation and they all passed.
 
