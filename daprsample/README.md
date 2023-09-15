@@ -1,18 +1,22 @@
-# Rate-limiting a DAPR HTTP Binding
+# Rate-limiting a DAPR HTTP Binding - Design proposal
 
 ## Introduction
 
-DAPR has a convenient HTTP binding that allows you to invoke any REST endpoint from your application. This is useful for integrating with external services, such as Twilio, SendGrid, or any other service that exposes a REST API. However, many of these services have rate limits, and you need to be able to handle these rate limits in your application. Currently the DAPR HTTP binding does not provide a way to handle rate limits, so you need to implement this yourself. This sample shows how to do that using an available rate-limiting library in Golang.
+DAPR has a convenient HTTP binding that allows you to invoke any REST endpoint from your application. This is useful for integrating with external services, such as Twilio, SendGrid, or any other service that exposes an HTTP API. However, legacy or enterprise services may have rate limits or budgets that have to be honored by the application calling the APIs. This sample shows how a DAPR application can to do that by extending an available rate-limiting library in Golang.
 
-While this sample shows the how to integrate rate-limiting with DAPR state so that you can implement a distributed rate-limiting solution, this approach would have to be implemented into the DAPR runtime to be truly useful.
+While this sample shows how to implement rate-limiting using DAPR State to store the distributed token bucket, this approach would have to be integrated into the DAPR runtime to be truly useful. Some design ideas are proposed in the conclusion.
 
 ## daprstore implementation
 
-An existing rate-limiting library (in golang) was extended to support distributed rate-limiting using DAPR state. This library was interesting because it allowed multiple stores to be implemented to store the token bucket that is used for the rate-limiting. Out-of-the-box, a memory store and a no-op store are implemented. Based on the memory store implementation, a DAPR state store was implemented. The DAPR state store is implemented in the [daprstore](../daprstore) directory.
+This existing rate-limiting library was extended to support distributed rate-limiting using DAPR state. This library was interesting because it allowed multiple stores to be implemented to store the token bucket that is used for the rate-limiting. Out-of-the-box, a memory store and a no-op store are implemented. Based on the memory store implementation, a DAPR state store was implemented. The DAPR state store is implemented in the [daprstore](../daprstore) directory.
 
 The contents of the token buket are preserved in DAPR state and if there are any server-side conflicts (due to eTag mismatch for example) they are resolved by retrying the operation until the bucket state is consistent. A mutex is used to manage in-process concurrency of the token bucket state to avoid multiple writes to the DAPR state store from the same process.
 
 All of the existing test cases for the rate-limiting library (memorystore) were run against the DAPR state store implementation and they all passed.
+
+## Running the tests and sample
+
+To run the tests and sample, you need to have DAPR installed and running. You also need to have a DAPR state store configured. The sample uses the Redis state store. It is also recommended that you use a Redis state store in production since the token bucket algorithm is heavy on read-write operations and Redis is very fast at this.
 
 ### Running the tests
 
@@ -29,10 +33,6 @@ This will executed the same set of tests that were developed for the *memorystor
 == APP == PASS
 == APP == ok  	github.com/sethvargo/go-limiter/daprstore	2.157s
 ```
-
-## Running the sample
-
-To run the sample, you need to have DAPR installed and running. You also need to have a DAPR state store configured. The sample uses the Redis state store. It is also recommended that you use a Redis state store in production since the token bucket algorithm is heavy on read-write operations and Redis is very fast at this.
 
 ### Simple use-case
 
@@ -113,4 +113,4 @@ The Azure Servive Bus binding in DAPR provides a fixed rate of messages per seco
 
 ### Other Bindings
 
-In a similar way, other bindings may benefit from the Token Bucket algorithm to the control flow of execution. Any of the Pub/Sub message brokers and bindings can be extended to use the Token Bucket algorithm to control the flow of messages, so if there is a common flow in the code that is used by all of the bindings, it would be better to implement the Token Bucket algorithm in that common flow.
+In a similar way, other bindings may benefit from the Token Bucket algorithm to the control flow of execution. Any of the Pub/Sub message brokers and bindings can be extended to use the Token Bucket algorithm to control the flow of messages, so if there is a common flow in the DAPR runtime that is used by all of the bindings, it would be better to implement the Token Bucket algorithm in that common flow.
