@@ -66,7 +66,7 @@ You will notice that the tokens are consumed at about 1 per second.
 
 ### Distributed use-case
 
-Re-run the ./runsample.sh sceipt in a terminal window and while it it is running, open another terminal window and run the ./runsample2.sh script. This will start another instance of the sample application. The sample application will now also attempt to take 50 tokens from the token bucket, but this time it will do so in co-ordination with the other instance. You will notice the outout of each terminal window is interleaved as the two instances of the sample application take turns taking tokens from the bucket. 
+Re-run the ./runsample.sh script in a terminal window and while it it is running, open another terminal window and run the ./runsample2.sh script. This will start another instance of the sample application. The sample application will now also attempt to take 50 tokens from the token bucket, but this time it will do so in co-ordination with the other instance. You will notice the outout of each terminal window is interleaved as the two instances of the sample application take turns taking tokens from the bucket. 
 
 > Both applications must use the same DAPR *app-id* in order to share the same state.
 
