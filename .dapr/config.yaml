@@ -3,12 +3,5 @@ kind: Configuration
 metadata:
   name: config
 spec:
-  features:
-    - name: Resiliency
-      enabled: true
-  appHttpPipeline:
-    handlers:
-      - name: ratelimit
-        type: middleware.http.ratelimit
   tracing:
     samplingRate: "1"
