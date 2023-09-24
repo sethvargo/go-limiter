@@ -16,7 +16,7 @@ All of the existing test cases for the rate-limiting library (memorystore) were 
 
 ## Running the tests and sample
 
-To run the tests and sample, you need to have DAPR installed and running. You also need to have a DAPR state store configured. The sample uses the Redis state store. It is also recommended that you use a Redis state store in production since the token bucket algorithm is heavy on read-write operations and Redis is very fast at this.
+To run the tests and sample, you need to have DAPR [installed and initialized](https://docs.dapr.io/getting-started/install-dapr-cli/). You also need to have a DAPR state store configured. The sample uses the Redis state store. It is also recommended that you use a Redis state store in production since the token bucket algorithm is heavy on read-write operations and Redis is very fast at this.
 
 ### Running the tests
 
