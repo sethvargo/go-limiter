@@ -5,15 +5,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/sethvargo/go-limiter/memorystore"
+	"github.com/sethvargo/go-limiter/daprstore"
 )
 
 func ExampleNew() {
 	ctx := context.Background()
 
-	store, err := memorystore.New(&memorystore.Config{
-		Tokens:   15,
-		Interval: time.Minute,
+	store, err := daprstore.New(&daprstore.Config{
+		Tokens:         15,
+		Interval:       time.Minute,
+		StateStoreName: "statestore",
 	})
 	if err != nil {
 		log.Fatal(err)
