@@ -293,13 +293,21 @@ func (b *bucket) take() (tokens uint64, remaining uint64, reset uint64, ok bool,
 	// Capture the current request time, current tick, and amount of time until
 	// the bucket resets.
 	now := fasttime.Now()
+
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	// If the current time is before the start time, it means the server clock was
+	// reset to an earlier time. In that case, rebase to 0.
+	if now < b.startTime {
+		b.startTime = now
+		b.lastTick = 0
+	}
+
 	currTick := tick(b.startTime, now, b.interval)
 
 	tokens = b.maxTokens
 	reset = b.startTime + ((currTick + 1) * uint64(b.interval))
-
-	b.lock.Lock()
-	defer b.lock.Unlock()
 
 	// If we're on a new tick since last assessment, perform
 	// a full reset up to maxTokens.
