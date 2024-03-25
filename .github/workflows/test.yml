@@ -1,14 +1,14 @@
-name: Test
+name: 'Test'
 
 on:
   push:
     branches:
-    - main
+      - 'main'
     tags:
-    - '*'
+      - '*'
   pull_request:
     branches:
-    - main
+      - 'main'
 
 jobs:
   # unit runs the unit tests
@@ -16,38 +16,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go:
-        - '1.14'
-        - '1.15'
-        - '1.16'
-        - '1.17'
         os:
-        - 'macos-latest'
-        - 'ubuntu-latest'
-        - 'windows-latest'
+          - 'macos-latest'
+          - 'ubuntu-latest'
+          - 'windows-latest'
 
-    runs-on: ${{ matrix.os }}
+    runs-on: '${{ matrix.os }}'
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: 'actions/checkout@v4'
 
-    - uses: actions/setup-go@v2
+    - uses: 'actions/setup-go@v5'
       with:
-        go-version: ${{ matrix.go }}
-
-    - uses: actions/cache@v2
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+        go-version-file: 'go.mod'
 
     - name: Lint
-      run: make fmtcheck staticcheck spellcheck
-      if: ${{ matrix.os == 'ubuntu-latest' && matrix.go == '1.16' }}
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |-
+        make fmtcheck staticcheck spellcheck
 
     - name: Test
-      run: make test
+      run: |-
+        make test-acc
 
   # build runs go build on the target platforms to ensure the runtime links are
   # correct.
@@ -56,34 +46,28 @@ jobs:
       fail-fast: false
       matrix:
         goos:
-        - 'darwin'
-        - 'freebsd'
-        - 'linux'
-        - 'netbsd'
-        - 'openbsd'
-        - 'solaris'
-        - 'windows'
+          - 'darwin'
+          - 'freebsd'
+          - 'linux'
+          - 'netbsd'
+          - 'openbsd'
+          - 'solaris'
+          - 'windows'
         goarch:
-        - 'amd64'
+          - 'amd64'
 
     runs-on: 'ubuntu-latest'
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: 'actions/checkout@v4'
 
-    - uses: actions/setup-go@v2
+    - uses: 'actions/setup-go@v5'
       with:
-        go-version: '1.16'
-
-    - uses: actions/cache@v2
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
+        go-version-file: 'go.mod'
 
     - name: Build
       env:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
-      run: go build ./...
+      run: |-
+        go build -a ./...

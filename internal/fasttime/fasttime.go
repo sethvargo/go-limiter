@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 // Package fasttime gets wallclock time, but super fast.
 package fasttime

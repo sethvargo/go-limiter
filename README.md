@@ -1,7 +1,7 @@
 # Go Rate Limiter
 
-[![GoDoc](https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://pkg.go.dev/mod/github.com/sethvargo/go-limiter)
-[![GitHub Actions](https://img.shields.io/github/workflow/status/sethvargo/go-limiter/Test?style=flat-square)](https://github.com/sethvargo/go-limiter/actions?query=workflow%3ATest)
+[![GoDoc](https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://pkg.go.dev/github.com/sethvargo/go-limiter)
+[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/sethvargo/go-limiter/test.yml?style=flat-square)](https://github.com/sethvargo/go-limiter/actions/workflows/test.yml)
 
 
 This package provides a rate limiter in Go (Golang), suitable for use in HTTP
