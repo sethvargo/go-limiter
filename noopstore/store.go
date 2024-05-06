@@ -22,6 +22,11 @@ func (s *store) Take(_ context.Context, _ string) (uint64, uint64, uint64, bool,
 	return 0, 0, 0, true, nil
 }
 
+// TakeMultiple always allows the request.
+func (s *store) TakeMultiple(_ context.Context, _ string, _ uint64) (uint64, uint64, uint64, bool, error) {
+	return 0, 0, 0, true, nil
+}
+
 // Get does nothing.
 func (s *store) Get(_ context.Context, _ string) (uint64, uint64, error) {
 	return 0, 0, nil

@@ -37,6 +37,22 @@ type Store interface {
 	// See the note about keys on the interface documentation.
 	Take(ctx context.Context, key string) (tokens, remaining, reset uint64, ok bool, err error)
 
+	// TakeMultiple takes multiple tokens from the given key if available, returning:
+	//
+	// - the configured limit size
+	// - the number of remaining tokens in the interval
+	// - the server time when new tokens will be available
+	// - whether the take was successful
+	// - any errors that occurred while performing the take - these should be
+	//   backend errors (e.g. connection failures); Take() should never return an
+	//   error for an bucket.
+	//
+	// If "ok" is false, the take was unsuccessful and the caller should NOT
+	// service the request.
+	//
+	// See the note about keys on the interface documentation.
+	TakeMultiple(ctx context.Context, key string, tokenCount uint64) (tokens, remaining, reset uint64, ok bool, err error)
+
 	// Get gets the current limit and remaining tokens for the provided key. It
 	// does not change any of the values.
 	Get(ctx context.Context, key string) (tokens, remaining uint64, err error)

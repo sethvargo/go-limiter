@@ -143,6 +143,43 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 	return b.take()
 }
 
+// Take attempts to remove multiple tokens from the named key. If the take is
+// successful, it returns true, otherwise false. It also returns the configured
+// limit, remaining tokens, and reset time.
+func (s *store) TakeMultiple(ctx context.Context, key string, tokenCount uint64) (uint64, uint64, uint64, bool, error) {
+	// If the store is stopped, all requests are rejected.
+	if atomic.LoadUint32(&s.stopped) == 1 {
+		return 0, 0, 0, false, limiter.ErrStopped
+	}
+
+	// Acquire a read lock first - this allows other to concurrently check limits
+	// without taking a full lock.
+	s.dataLock.RLock()
+	if b, ok := s.data[key]; ok {
+		s.dataLock.RUnlock()
+		return b.take()
+	}
+	s.dataLock.RUnlock()
+
+	// Unfortunately we did not find the key in the map. Take out a full lock. We
+	// have to check if the key exists again, because it's possible another
+	// goroutine created it between our shared lock and exclusive lock.
+	s.dataLock.Lock()
+	if b, ok := s.data[key]; ok {
+		s.dataLock.Unlock()
+		return b.takeMultiple(tokenCount)
+	}
+
+	// This is the first time we've seen this entry (or it's been garbage
+	// collected), so create the bucket and take an initial request.
+	b := newBucket(s.tokens, s.interval)
+
+	// Add it to the map and take.
+	s.data[key] = b
+	s.dataLock.Unlock()
+	return b.take()
+}
+
 // Get retrieves the information about the key, if any exists.
 func (s *store) Get(ctx context.Context, key string) (uint64, uint64, error) {
 	// If the store is stopped, all requests are rejected.
@@ -318,6 +355,44 @@ func (b *bucket) take() (tokens uint64, remaining uint64, reset uint64, ok bool,
 
 	if b.availableTokens > 0 {
 		b.availableTokens--
+		ok = true
+		remaining = b.availableTokens
+	}
+
+	return
+}
+
+// takeMultiple will attempt to remove multiple tokens from a bucket.
+// This is useful for cases where some tasks may have more cost than others.
+func (b *bucket) takeMultiple(tokenCount uint64) (tokens uint64, remaining uint64, reset uint64, ok bool, retErr error) {
+	// Capture the current request time, current tick, and amount of time until
+	// the bucket resets.
+	now := fasttime.Now()
+
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	// If the current time is before the start time, it means the server clock was
+	// reset to an earlier time. In that case, rebase to 0.
+	if now < b.startTime {
+		b.startTime = now
+		b.lastTick = 0
+	}
+
+	currTick := tick(b.startTime, now, b.interval)
+
+	tokens = b.maxTokens
+	reset = b.startTime + ((currTick + 1) * uint64(b.interval))
+
+	// If we're on a new tick since last assessment, perform
+	// a full reset up to maxTokens.
+	if b.lastTick < currTick {
+		b.availableTokens = b.maxTokens
+		b.lastTick = currTick
+	}
+
+	if b.availableTokens >= tokenCount {
+		b.availableTokens -= tokenCount
 		ok = true
 		remaining = b.availableTokens
 	}
