@@ -135,7 +135,7 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 
 	// This is the first time we've seen this entry (or it's been garbage
 	// collected), so create the bucket and take an initial request.
-	b := newBucket(s.tokens, s.interval)
+	b := newBucket(s.tokens, s.interval, false)
 
 	// Add it to the map and take.
 	s.data[key] = b
@@ -165,7 +165,7 @@ func (s *store) Get(ctx context.Context, key string) (uint64, uint64, error) {
 // Set configures the bucket-specific tokens and interval.
 func (s *store) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error {
 	s.dataLock.Lock()
-	b := newBucket(tokens, interval)
+	b := newBucket(tokens, interval, true)
 	s.data[key] = b
 	s.dataLock.Unlock()
 	return nil
@@ -183,7 +183,7 @@ func (s *store) Burst(ctx context.Context, key string, tokens uint64) error {
 	}
 
 	// If we got this far, there's no current record for the key.
-	b := newBucket(s.tokens+tokens, s.interval)
+	b := newBucket(s.tokens+tokens, s.interval, false)
 	s.data[key] = b
 	s.dataLock.Unlock()
 	return nil
@@ -232,7 +232,7 @@ func (s *store) purge() {
 			lastTime := b.startTime + (b.lastTick * uint64(b.interval))
 			b.lock.Unlock()
 
-			if now-lastTime > s.sweepMinTTL {
+			if now-lastTime > s.sweepMinTTL && !b.persist {
 				delete(s.data, k)
 			}
 		}
@@ -260,17 +260,21 @@ type bucket struct {
 	// on the bucket.
 	lastTick uint64
 
+	// persist is a flag used to prevent purge from deleting a bucket.
+	persist bool
+
 	// lock guards the mutable fields.
 	lock sync.Mutex
 }
 
 // newBucket creates a new bucket from the given tokens and interval.
-func newBucket(tokens uint64, interval time.Duration) *bucket {
+func newBucket(tokens uint64, interval time.Duration, persist bool) *bucket {
 	b := &bucket{
 		startTime:       fasttime.Now(),
 		maxTokens:       tokens,
 		availableTokens: tokens,
 		interval:        interval,
+		persist:         persist,
 	}
 	return b
 }
