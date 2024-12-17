@@ -261,7 +261,7 @@ type bucket struct {
 	lastTick uint64
 
 	// lock guards the mutable fields.
-	lock sync.Mutex
+	lock sync.RWMutex
 }
 
 // newBucket creates a new bucket from the given tokens and interval.
@@ -277,8 +277,8 @@ func newBucket(tokens uint64, interval time.Duration) *bucket {
 
 // get returns information about the bucket.
 func (b *bucket) get() (tokens uint64, remaining uint64, retErr error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	b.lock.RLock()
+	defer b.lock.RUnlock()
 
 	tokens = b.maxTokens
 	remaining = b.availableTokens
