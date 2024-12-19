@@ -68,7 +68,7 @@ func TestStore_Exercise(t *testing.T) {
 
 	// Get when no config exists
 	{
-		limit, remaining, err := s.(*store).Get(ctx, key)
+		limit, remaining, _, err := s.(*store).Get(ctx, key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -103,7 +103,7 @@ func TestStore_Exercise(t *testing.T) {
 
 	// Get the value
 	{
-		limit, remaining, err := s.(*store).Get(ctx, key)
+		limit, remaining, _, err := s.(*store).Get(ctx, key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -124,7 +124,7 @@ func TestStore_Exercise(t *testing.T) {
 
 	// Get the value again
 	{
-		limit, remaining, err := s.(*store).Get(ctx, key)
+		limit, remaining, _, err := s.(*store).Get(ctx, key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -158,7 +158,7 @@ func TestStore_Exercise(t *testing.T) {
 
 	// Get the value again
 	{
-		limit, remaining, err := s.(*store).Get(ctx, key)
+		limit, remaining, _, err := s.(*store).Get(ctx, key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,7 +196,7 @@ func TestStore_Exercise(t *testing.T) {
 
 	// Get the value one final time
 	{
-		limit, remaining, err := s.(*store).Get(ctx, key)
+		limit, remaining, _, err := s.(*store).Get(ctx, key)
 		if err != nil {
 			t.Fatal(err)
 		}
