@@ -175,8 +175,8 @@ func (s *store) Set(ctx context.Context, key string, tokens uint64, interval tim
 func (s *store) Burst(ctx context.Context, key string, tokens uint64) error {
 	s.dataLock.Lock()
 	if b, ok := s.data[key]; ok {
-		b.lock.Lock()
 		s.dataLock.Unlock()
+		b.lock.Lock()
 		b.availableTokens = b.availableTokens + tokens
 		b.lock.Unlock()
 		return nil
