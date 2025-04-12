@@ -173,12 +173,19 @@ func (s *store) Set(ctx context.Context, key string, tokens uint64, interval tim
 
 // Burst adds the provided value to the bucket's currently available tokens.
 func (s *store) Burst(ctx context.Context, key string, tokens uint64) error {
-	s.dataLock.Lock()
+	s.dataLock.RLock()
 	if b, ok := s.data[key]; ok {
-		b.lock.Lock()
+		s.dataLock.RUnlock()
+		b.burst(tokens)
+		return nil
+	}
+	s.dataLock.RUnlock()
+
+	s.dataLock.Lock()
+	// check again just in case
+	if b, ok := s.data[key]; ok {
 		s.dataLock.Unlock()
-		b.availableTokens = b.availableTokens + tokens
-		b.lock.Unlock()
+		b.burst(tokens)
 		return nil
 	}
 
@@ -225,18 +232,25 @@ func (s *store) purge() {
 		case <-ticker.C:
 		}
 
-		s.dataLock.Lock()
+		s.dataLock.RLock()
 		now := fasttime.Now()
+		var deletes []string
 		for k, b := range s.data {
-			b.lock.Lock()
+			b.lock.RLock()
 			lastTime := b.startTime + (b.lastTick * uint64(b.interval))
-			b.lock.Unlock()
+			b.lock.RUnlock()
 
 			if now-lastTime > s.sweepMinTTL {
-				delete(s.data, k)
+				deletes = append(deletes, k)
 			}
 		}
-		s.dataLock.Unlock()
+		s.dataLock.RUnlock()
+
+		for _, k := range deletes {
+			s.dataLock.Lock()
+			delete(s.data, k)
+			s.dataLock.Unlock()
+		}
 	}
 }
 
@@ -323,6 +337,13 @@ func (b *bucket) take() (tokens uint64, remaining uint64, reset uint64, ok bool,
 	}
 
 	return
+}
+
+// burst adds the specified number of tokens to the bucket's available tokens in a thread-safe manner.
+func (b *bucket) burst(tokens uint64) {
+	b.lock.Lock()
+	b.availableTokens = b.availableTokens + tokens
+	b.lock.Unlock()
 }
 
 // tick is the total number of times the current interval has occurred between
