@@ -7,7 +7,7 @@ toolchain go1.24.6
 replace github.com/sethvargo/go-limiter => ../
 
 require (
-	github.com/clipperhouse/rate v0.2.0
+	github.com/clipperhouse/rate v0.5.0
 	github.com/didip/tollbooth/v6 v6.1.1
 	github.com/gomodule/redigo v1.8.5
 	github.com/sethvargo/go-limiter v0.6.0
@@ -19,6 +19,7 @@ require (
 
 require (
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
+	github.com/clipperhouse/ntime v0.1.1 // indirect
 	github.com/go-pkgz/expirable-cache v0.0.3 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

@@ -2,8 +2,10 @@ github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 h1:MzBOUgng9or
 github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129/go.mod h1:rFgpPQZYZ8vdbc+48xibu8ALc3yeyd64IhHS+PU6Yyg=
 github.com/andybalholm/brotli v1.0.0/go.mod h1:loMXtMfwqflxFJPmdbJO0a3KNoPuLBgiu3qAvBg8x/Y=
 github.com/cespare/xxhash/v2 v2.1.1/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
-github.com/clipperhouse/rate v0.2.0 h1:JmilsQ2LE3QZS+lglBAWowqnAEG+Q6XOXVh6FrtwubM=
-github.com/clipperhouse/rate v0.2.0/go.mod h1:VZNuVghE/JjjFwv7gdQEhLAcqAp72zE6aiprfb4n7ew=
+github.com/clipperhouse/ntime v0.1.1 h1:1nNgeCpB8e5IyiVvsJMhhynnnvstbD+MnmyTtdt7fBo=
+github.com/clipperhouse/ntime v0.1.1/go.mod h1:ltkB4V9vsTzh0x0qwOJPlxHHtAJJA4I+EJKjhbEktWY=
+github.com/clipperhouse/rate v0.5.0 h1:1meL91Sxtk6hL48IRU6NZ43J3NkS29q7yodFoJPnlk0=
+github.com/clipperhouse/rate v0.5.0/go.mod h1:rA+5DmDc7p4wVcb8HkZQ32tnkVyYJpkJOcaJVIbeAo4=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
