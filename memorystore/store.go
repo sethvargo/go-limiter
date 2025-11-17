@@ -240,6 +240,14 @@ func (s *store) purge() {
 			lastTime := b.startTime + (b.lastTick * uint64(b.interval))
 			b.lock.RUnlock()
 
+			// There's a very rare edge case where the server clock is reset between
+			// the call to fasttime.Now() above and when this bucket is locked. This
+			// is more likely when there are many buckets, since this function will
+			// take longer to run.
+			if lastTime > now {
+				lastTime = now
+			}
+
 			if now-lastTime > s.sweepMinTTL {
 				deletes = append(deletes, k)
 			}
