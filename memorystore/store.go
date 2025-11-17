@@ -57,6 +57,11 @@ type Config struct {
 	// memory consumption for performance as it limits the number of times the map
 	// needs to expand. The default value is 4096.
 	InitialAlloc int
+
+	// DisablePurge disables the purge operation. WARNING: this will cause
+	// unbounded memory growth. Do not enable unless you have a fixed number of
+	// buckets.
+	DisablePurge bool
 }
 
 // New creates an in-memory rate limiter that uses a bucketing model to limit
@@ -102,7 +107,11 @@ func New(c *Config) (limiter.Store, error) {
 		data:   make(map[string]*bucket, initialAlloc),
 		stopCh: make(chan struct{}),
 	}
-	go s.purge()
+
+	if !c.DisablePurge {
+		go s.purge()
+	}
+
 	return s, nil
 }
 
