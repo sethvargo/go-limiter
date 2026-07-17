@@ -23,7 +23,7 @@ type store struct {
 	data     map[string]*bucket
 	dataLock sync.RWMutex
 
-	stopped uint32
+	stopped atomic.Bool
 	stopCh  chan struct{}
 }
 
@@ -120,7 +120,7 @@ func New(c *Config) (limiter.Store, error) {
 // limit, remaining tokens, and reset time.
 func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, bool, error) {
 	// If the store is stopped, all requests are rejected.
-	if atomic.LoadUint32(&s.stopped) == 1 {
+	if s.stopped.Load() {
 		return 0, 0, 0, false, limiter.ErrStopped
 	}
 
@@ -155,7 +155,7 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 // Get retrieves the information about the key, if any exists.
 func (s *store) Get(ctx context.Context, key string) (uint64, uint64, error) {
 	// If the store is stopped, all requests are rejected.
-	if atomic.LoadUint32(&s.stopped) == 1 {
+	if s.stopped.Load() {
 		return 0, 0, limiter.ErrStopped
 	}
 
@@ -209,7 +209,7 @@ func (s *store) Burst(ctx context.Context, key string, tokens uint64) error {
 // sessions. You should always call Close() as it releases the memory consumed
 // by the map AND releases the tickers.
 func (s *store) Close(ctx context.Context) error {
-	if !atomic.CompareAndSwapUint32(&s.stopped, 0, 1) {
+	if !s.stopped.CompareAndSwap(false, true) {
 		return nil
 	}
 
@@ -218,9 +218,7 @@ func (s *store) Close(ctx context.Context) error {
 
 	// Delete all the things.
 	s.dataLock.Lock()
-	for k := range s.data {
-		delete(s.data, k)
-	}
+	clear(s.data)
 	s.dataLock.Unlock()
 	return nil
 }
@@ -253,9 +251,7 @@ func (s *store) purge() {
 			// the call to fasttime.Now() above and when this bucket is locked. This
 			// is more likely when there are many buckets, since this function will
 			// take longer to run.
-			if lastTime > now {
-				lastTime = now
-			}
+			lastTime = min(lastTime, now)
 
 			if now-lastTime > s.sweepMinTTL {
 				deletes = append(deletes, k)
