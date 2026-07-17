@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -125,5 +126,43 @@ func TestNewMiddleware(t *testing.T) {
 				t.Errorf("remaining: expected %d to be %d", got, want)
 			}
 		})
+	}
+}
+
+func TestMiddleware_Handle_reset_header_gmt(t *testing.T) {
+	t.Parallel()
+
+	store, err := memorystore.New(&memorystore.Config{
+		Tokens:   1,
+		Interval: time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	middleware, err := httplimit.NewMiddleware(store, httplimit.IPKeyFunc())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doWork := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	server := httptest.NewServer(middleware.Handle(doWork))
+	defer server.Close()
+
+	resp, err := server.Client().Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// RFC 9110 requires HTTP-dates to be expressed in GMT.
+	reset := resp.Header.Get(httplimit.HeaderRateLimitReset)
+	if !strings.HasSuffix(reset, " GMT") {
+		t.Errorf("expected %q to be an HTTP-date in GMT", reset)
+	}
+	if _, err := http.ParseTime(reset); err != nil {
+		t.Errorf("expected %q to be a valid HTTP-date: %v", reset, err)
 	}
 }

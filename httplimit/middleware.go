@@ -18,13 +18,13 @@ import (
 const (
 	// HeaderRateLimitLimit, HeaderRateLimitRemaining, and HeaderRateLimitReset
 	// are the recommended return header values from IETF on rate limiting. Reset
-	// is in UTC time.
+	// is an HTTP-date in GMT.
 	HeaderRateLimitLimit     = "X-RateLimit-Limit"
 	HeaderRateLimitRemaining = "X-RateLimit-Remaining"
 	HeaderRateLimitReset     = "X-RateLimit-Reset"
 
 	// HeaderRetryAfter is the header used to indicate when a client should retry
-	// requests (when the rate limit expires), in UTC time.
+	// requests (when the rate limit expires), as an HTTP-date in GMT.
 	HeaderRetryAfter = "Retry-After"
 )
 
@@ -106,7 +106,7 @@ func (m *Middleware) Handle(next http.Handler) http.Handler {
 			return
 		}
 
-		resetTime := time.Unix(0, int64(reset)).UTC().Format(time.RFC1123)
+		resetTime := time.Unix(0, int64(reset)).UTC().Format(http.TimeFormat)
 
 		// Set headers (we do this regardless of whether the request is permitted).
 		w.Header().Set(HeaderRateLimitLimit, strconv.FormatUint(limit, 10))
