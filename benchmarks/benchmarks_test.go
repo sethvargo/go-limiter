@@ -30,12 +30,9 @@ const (
 var sessions map[int]string
 
 func init() {
-	// Use math/rand since we don't actually need secure crypto here.
-	rand.Seed(time.Now().UnixNano())
-
-	data := make([]string, NumSessions)
+	sessions = make(map[int]string, NumSessions)
 	for i := 0; i < NumSessions; i++ {
-		data[i] = strconv.Itoa(rand.Int())
+		sessions[i] = strconv.Itoa(rand.Int())
 	}
 }
 
