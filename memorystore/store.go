@@ -21,8 +21,13 @@ type store struct {
 	sweepInterval time.Duration
 	sweepMinTTL   uint64
 
-	data     map[string]*bucket
-	dataLock sync.RWMutex
+	// data holds the per-key buckets. It is a sync.Map because the access
+	// pattern is create-once, read-many: a bucket is created on a key's first
+	// Take and then read on every subsequent Take. sync.Map serves those reads
+	// from a read-only snapshot without mutating shared state, avoiding the
+	// per-call atomic writes an RWMutex makes to a single counter (which bounces
+	// that cache line across cores under load).
+	data sync.Map // map[string]*bucket
 
 	stopped atomic.Bool
 	stopCh  chan struct{}
@@ -53,10 +58,9 @@ type Config struct {
 	// before they limit is applied. The default value is 12 hours.
 	SweepMinTTL time.Duration
 
-	// InitialAlloc is the size to use for the in-memory map. Go will
-	// automatically expand the buffer, but choosing higher number can trade
-	// memory consumption for performance as it limits the number of times the map
-	// needs to expand. The default value is 4096.
+	// InitialAlloc previously pre-sized the in-memory map. It is retained for
+	// backward compatibility but no longer has any effect: the store now uses a
+	// sync.Map, which does not support pre-sizing.
 	InitialAlloc int
 
 	// DisablePurge disables the purge operation. WARNING: this will cause
@@ -93,11 +97,6 @@ func New(c *Config) (limiter.Store, error) {
 		sweepMinTTL = c.SweepMinTTL
 	}
 
-	initialAlloc := 4096
-	if c.InitialAlloc > 0 {
-		initialAlloc = c.InitialAlloc
-	}
-
 	s := &store{
 		tokens:   tokens,
 		interval: interval,
@@ -105,7 +104,6 @@ func New(c *Config) (limiter.Store, error) {
 		sweepInterval: sweepInterval,
 		sweepMinTTL:   uint64(sweepMinTTL),
 
-		data:   make(map[string]*bucket, initialAlloc),
 		stopCh: make(chan struct{}),
 	}
 
@@ -125,32 +123,17 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 		return 0, 0, 0, false, limiter.ErrStopped
 	}
 
-	// Acquire a read lock first - this allows other to concurrently check limits
-	// without taking a full lock.
-	s.dataLock.RLock()
-	if b, ok := s.data[key]; ok {
-		s.dataLock.RUnlock()
-		return b.take()
-	}
-	s.dataLock.RUnlock()
-
-	// Unfortunately we did not find the key in the map. Take out a full lock. We
-	// have to check if the key exists again, because it's possible another
-	// goroutine created it between our shared lock and exclusive lock.
-	s.dataLock.Lock()
-	if b, ok := s.data[key]; ok {
-		s.dataLock.Unlock()
-		return b.take()
+	// The common case is an existing bucket, which sync.Map serves from its
+	// read-only path without mutating shared state.
+	if v, ok := s.data.Load(key); ok {
+		return v.(*bucket).take()
 	}
 
-	// This is the first time we've seen this entry (or it's been garbage
-	// collected), so create the bucket and take an initial request.
+	// First time we've seen this key (or it was garbage collected). Create a
+	// bucket and store it, deferring to the winner if another goroutine raced us.
 	b := newBucket(s.tokens, s.interval)
-
-	// Add it to the map and take.
-	s.data[key] = b
-	s.dataLock.Unlock()
-	return b.take()
+	actual, _ := s.data.LoadOrStore(key, b)
+	return actual.(*bucket).take()
 }
 
 // Get retrieves the information about the key, if any exists.
@@ -162,12 +145,9 @@ func (s *store) Get(ctx context.Context, key string) (uint64, uint64, error) {
 
 	// Acquire a read lock first - this allows other to concurrently check limits
 	// without taking a full lock.
-	s.dataLock.RLock()
-	if b, ok := s.data[key]; ok {
-		s.dataLock.RUnlock()
-		return b.get()
+	if v, ok := s.data.Load(key); ok {
+		return v.(*bucket).get()
 	}
-	s.dataLock.RUnlock()
 
 	return 0, 0, nil
 }
@@ -180,35 +160,23 @@ func (s *store) Set(ctx context.Context, key string, tokens uint64, interval tim
 		interval = s.interval
 	}
 
-	s.dataLock.Lock()
-	b := newBucket(tokens, interval)
-	s.data[key] = b
-	s.dataLock.Unlock()
+	s.data.Store(key, newBucket(tokens, interval))
 	return nil
 }
 
 // Burst adds the provided value to the bucket's currently available tokens.
 func (s *store) Burst(ctx context.Context, key string, tokens uint64) error {
-	s.dataLock.RLock()
-	if b, ok := s.data[key]; ok {
-		s.dataLock.RUnlock()
-		b.burst(tokens)
-		return nil
-	}
-	s.dataLock.RUnlock()
-
-	s.dataLock.Lock()
-	// check again just in case
-	if b, ok := s.data[key]; ok {
-		s.dataLock.Unlock()
-		b.burst(tokens)
+	if v, ok := s.data.Load(key); ok {
+		v.(*bucket).burst(tokens)
 		return nil
 	}
 
-	// If we got this far, there's no current record for the key.
+	// No current record for the key. Create one pre-filled with the burst; if
+	// another goroutine raced us, burst onto the winner instead.
 	b := newBucket(s.tokens+tokens, s.interval)
-	s.data[key] = b
-	s.dataLock.Unlock()
+	if actual, loaded := s.data.LoadOrStore(key, b); loaded {
+		actual.(*bucket).burst(tokens)
+	}
 	return nil
 }
 
@@ -224,9 +192,10 @@ func (s *store) Close(ctx context.Context) error {
 	close(s.stopCh)
 
 	// Delete all the things.
-	s.dataLock.Lock()
-	clear(s.data)
-	s.dataLock.Unlock()
+	s.data.Range(func(k, _ any) bool {
+		s.data.Delete(k)
+		return true
+	})
 	return nil
 }
 
@@ -246,10 +215,9 @@ func (s *store) purge() {
 		case <-ticker.C:
 		}
 
-		s.dataLock.RLock()
 		now := fasttime.Now()
-		var deletes []string
-		for k, b := range s.data {
+		s.data.Range(func(k, v any) bool {
+			b := v.(*bucket)
 			b.lock.RLock()
 			lastTime := b.startTime + (b.lastTick * uint64(b.interval))
 			b.lock.RUnlock()
@@ -261,16 +229,10 @@ func (s *store) purge() {
 			lastTime = min(lastTime, now)
 
 			if now-lastTime > s.sweepMinTTL {
-				deletes = append(deletes, k)
+				s.data.Delete(k)
 			}
-		}
-		s.dataLock.RUnlock()
-
-		for _, k := range deletes {
-			s.dataLock.Lock()
-			delete(s.data, k)
-			s.dataLock.Unlock()
-		}
+			return true
+		})
 	}
 }
 
