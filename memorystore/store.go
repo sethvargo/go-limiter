@@ -3,6 +3,7 @@ package memorystore
 
 import (
 	"context"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,7 +24,7 @@ type store struct {
 	data     map[string]*bucket
 	dataLock sync.RWMutex
 
-	stopped uint32
+	stopped atomic.Bool
 	stopCh  chan struct{}
 }
 
@@ -120,7 +121,7 @@ func New(c *Config) (limiter.Store, error) {
 // limit, remaining tokens, and reset time.
 func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, bool, error) {
 	// If the store is stopped, all requests are rejected.
-	if atomic.LoadUint32(&s.stopped) == 1 {
+	if s.stopped.Load() {
 		return 0, 0, 0, false, limiter.ErrStopped
 	}
 
@@ -155,7 +156,7 @@ func (s *store) Take(ctx context.Context, key string) (uint64, uint64, uint64, b
 // Get retrieves the information about the key, if any exists.
 func (s *store) Get(ctx context.Context, key string) (uint64, uint64, error) {
 	// If the store is stopped, all requests are rejected.
-	if atomic.LoadUint32(&s.stopped) == 1 {
+	if s.stopped.Load() {
 		return 0, 0, limiter.ErrStopped
 	}
 
@@ -173,6 +174,12 @@ func (s *store) Get(ctx context.Context, key string) (uint64, uint64, error) {
 
 // Set configures the bucket-specific tokens and interval.
 func (s *store) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error {
+	// A non-positive interval would divide by zero in tick(). Fall back to the
+	// store's configured interval, mirroring New.
+	if interval <= 0 {
+		interval = s.interval
+	}
+
 	s.dataLock.Lock()
 	b := newBucket(tokens, interval)
 	s.data[key] = b
@@ -209,7 +216,7 @@ func (s *store) Burst(ctx context.Context, key string, tokens uint64) error {
 // sessions. You should always call Close() as it releases the memory consumed
 // by the map AND releases the tickers.
 func (s *store) Close(ctx context.Context) error {
-	if !atomic.CompareAndSwapUint32(&s.stopped, 0, 1) {
+	if !s.stopped.CompareAndSwap(false, true) {
 		return nil
 	}
 
@@ -218,9 +225,7 @@ func (s *store) Close(ctx context.Context) error {
 
 	// Delete all the things.
 	s.dataLock.Lock()
-	for k := range s.data {
-		delete(s.data, k)
-	}
+	clear(s.data)
 	s.dataLock.Unlock()
 	return nil
 }
@@ -253,9 +258,7 @@ func (s *store) purge() {
 			// the call to fasttime.Now() above and when this bucket is locked. This
 			// is more likely when there are many buckets, since this function will
 			// take longer to run.
-			if lastTime > now {
-				lastTime = now
-			}
+			lastTime = min(lastTime, now)
 
 			if now-lastTime > s.sweepMinTTL {
 				deletes = append(deletes, k)
@@ -356,10 +359,16 @@ func (b *bucket) take() (tokens uint64, remaining uint64, reset uint64, ok bool,
 	return
 }
 
-// burst adds the specified number of tokens to the bucket's available tokens in a thread-safe manner.
+// burst adds the specified number of tokens to the bucket's available tokens in
+// a thread-safe manner. The addition saturates at math.MaxUint64 so a large
+// burst cannot overflow and wrap to a smaller value.
 func (b *bucket) burst(tokens uint64) {
 	b.lock.Lock()
-	b.availableTokens = b.availableTokens + tokens
+	if b.availableTokens > math.MaxUint64-tokens {
+		b.availableTokens = math.MaxUint64
+	} else {
+		b.availableTokens += tokens
+	}
 	b.lock.Unlock()
 }
 
