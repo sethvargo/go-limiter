@@ -398,3 +398,46 @@ func TestBucketedLimiter_tick(t *testing.T) {
 		})
 	}
 }
+
+func TestStore_Set_zero_interval(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	s, err := New(&Config{
+		Tokens:   5,
+		Interval: 2 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := s.Close(ctx); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	key := testKey(t)
+
+	// A zero interval must not panic; it falls back to the store's interval.
+	if err := s.Set(ctx, key, 3, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	limit, remaining, reset, ok, err := s.Take(ctx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Errorf("expected ok")
+	}
+	if got, want := limit, uint64(3); got != want {
+		t.Errorf("expected %d to be %d", got, want)
+	}
+	if got, want := remaining, uint64(2); got != want {
+		t.Errorf("expected %d to be %d", got, want)
+	}
+	if got, want := time.Until(time.Unix(0, int64(reset))), 2*time.Second; got > want {
+		t.Errorf("expected %v to be less than %v", got, want)
+	}
+}
