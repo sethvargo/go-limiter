@@ -3,6 +3,7 @@ package memorystore
 
 import (
 	"context"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -358,10 +359,16 @@ func (b *bucket) take() (tokens uint64, remaining uint64, reset uint64, ok bool,
 	return
 }
 
-// burst adds the specified number of tokens to the bucket's available tokens in a thread-safe manner.
+// burst adds the specified number of tokens to the bucket's available tokens in
+// a thread-safe manner. The addition saturates at math.MaxUint64 so a large
+// burst cannot overflow and wrap to a smaller value.
 func (b *bucket) burst(tokens uint64) {
 	b.lock.Lock()
-	b.availableTokens = b.availableTokens + tokens
+	if b.availableTokens > math.MaxUint64-tokens {
+		b.availableTokens = math.MaxUint64
+	} else {
+		b.availableTokens += tokens
+	}
 	b.lock.Unlock()
 }
 

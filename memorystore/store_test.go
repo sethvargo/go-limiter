@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"math"
 	"sort"
 	"testing"
 	"time"
@@ -439,5 +440,26 @@ func TestStore_Set_zero_interval(t *testing.T) {
 	}
 	if got, want := time.Until(time.Unix(0, int64(reset))), 2*time.Second; got > want {
 		t.Errorf("expected %v to be less than %v", got, want)
+	}
+}
+
+func TestBucket_burst_saturates(t *testing.T) {
+	t.Parallel()
+
+	b := newBucket(10, time.Second)
+
+	b.lock.Lock()
+	b.availableTokens = math.MaxUint64 - 2
+	b.lock.Unlock()
+
+	// Adding more than the remaining headroom must clamp, not wrap.
+	b.burst(10)
+
+	b.lock.RLock()
+	got := b.availableTokens
+	b.lock.RUnlock()
+
+	if want := uint64(math.MaxUint64); got != want {
+		t.Errorf("expected %d to be %d", got, want)
 	}
 }
