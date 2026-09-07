@@ -44,18 +44,18 @@ type Config struct {
 	// default value is 1 second.
 	Interval time.Duration
 
-	// SweepInterval is the rate at which to run the garabage collection on stale
+	// SweepInterval is the rate at which to run the garbage collection on stale
 	// entries. Setting this to a low value will optimize memory consumption, but
 	// will likely reduce performance and increase lock contention. Setting this
 	// to a high value will maximum throughput, but will increase the memory
 	// footprint. This can be tuned in combination with SweepMinTTL to control how
-	// long stale entires are kept. The default value is 6 hours.
+	// long stale entries are kept. The default value is 6 hours.
 	SweepInterval time.Duration
 
 	// SweepMinTTL is the minimum amount of time a session must be inactive before
 	// clearing it from the entries. There's no validation, but this should be at
 	// least as high as your rate limit, or else the data store will purge records
-	// before they limit is applied. The default value is 12 hours.
+	// before their limit is applied. The default value is 12 hours.
 	SweepMinTTL time.Duration
 
 	// InitialAlloc previously pre-sized the in-memory map. It is retained for
