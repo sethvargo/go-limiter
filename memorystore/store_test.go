@@ -487,7 +487,11 @@ func TestStore_Burst_new_key(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { s.Close(ctx) })
+			t.Cleanup(func() {
+				if err := s.Close(ctx); err != nil {
+					t.Fatal(err)
+				}
+			})
 
 			if err := s.Burst(ctx, "key", tc.burst); err != nil {
 				t.Fatal(err)
@@ -496,16 +500,25 @@ func TestStore_Burst_new_key(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if limit != 5 || remaining != tc.remaining {
-				t.Errorf("Get: got limit %d, remaining %d; want 5, %d", limit, remaining, tc.remaining)
+			if got, want := limit, uint64(5); got != want {
+				t.Errorf("expected %d to be %d", got, want)
+			}
+			if got, want := remaining, tc.remaining; got != want {
+				t.Errorf("expected %d to be %d", got, want)
 			}
 
 			limit, remaining, _, ok, err := s.Take(ctx, "key")
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !ok || limit != 5 || remaining != tc.remaining-1 {
-				t.Errorf("Take: got limit %d, remaining %d, ok %t; want 5, %d, true", limit, remaining, ok, tc.remaining-1)
+			if got, want := limit, uint64(5); got != want {
+				t.Errorf("expected %d to be %d", got, want)
+			}
+			if got, want := remaining, tc.remaining-1; got != want {
+				t.Errorf("expected %d to be %d", got, want)
+			}
+			if got, want := ok, true; got != want {
+				t.Errorf("expected %t to be %t", got, want)
 			}
 		})
 	}
@@ -519,7 +532,11 @@ func TestStore_Burst_new_key_resets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { s.Close(ctx) })
+	t.Cleanup(func() {
+		if err := s.Close(ctx); err != nil {
+			t.Fatal(err)
+		}
+	})
 	if err := s.Burst(ctx, "key", 3); err != nil {
 		t.Fatal(err)
 	}
@@ -550,8 +567,14 @@ func TestStore_Burst_new_key_resets(t *testing.T) {
 		if i == 0 {
 			wantRemaining = 1
 		}
-		if wantOK := i < 2; limit != 2 || remaining != wantRemaining || ok != wantOK {
-			t.Errorf("reset Take %d: got limit %d, remaining %d, ok %t; want 2, %d, %t", i, limit, remaining, ok, wantRemaining, wantOK)
+		if got, want := limit, uint64(2); got != want {
+			t.Errorf("expected %d to be %d", got, want)
+		}
+		if got, want := remaining, wantRemaining; got != want {
+			t.Errorf("expected %d to be %d", got, want)
+		}
+		if got, want := ok, i < 2; got != want {
+			t.Errorf("expected %t to be %t", got, want)
 		}
 	}
 }
@@ -564,7 +587,11 @@ func TestStore_Burst_concurrent_new_key(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { s.Close(ctx) })
+	t.Cleanup(func() {
+		if err := s.Close(ctx); err != nil {
+			t.Fatal(err)
+		}
+	})
 
 	const count = 32
 	start := make(chan struct{})
@@ -586,7 +613,10 @@ func TestStore_Burst_concurrent_new_key(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if limit != 5 || remaining != 5+count {
-		t.Errorf("got limit %d, remaining %d; want 5, %d", limit, remaining, 5+count)
+	if got, want := limit, uint64(5); got != want {
+		t.Errorf("expected %d to be %d", got, want)
+	}
+	if got, want := remaining, uint64(5+count); got != want {
+		t.Errorf("expected %d to be %d", got, want)
 	}
 }
