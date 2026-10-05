@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -460,6 +461,162 @@ func TestBucket_burst_saturates(t *testing.T) {
 	b.lock.RUnlock()
 
 	if want := uint64(math.MaxUint64); got != want {
+		t.Errorf("expected %d to be %d", got, want)
+	}
+}
+
+func TestStore_Burst_new_key(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		burst     uint64
+		remaining uint64
+	}{
+		{"zero", 0, 5},
+		{"extra_tokens", 3, 8},
+		{"saturates", math.MaxUint64, math.MaxUint64},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			s, err := New(&Config{Tokens: 5, Interval: time.Hour, DisablePurge: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if err := s.Close(ctx); err != nil {
+					t.Fatal(err)
+				}
+			})
+
+			if err := s.Burst(ctx, "key", tc.burst); err != nil {
+				t.Fatal(err)
+			}
+			limit, remaining, err := s.Get(ctx, "key")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := limit, uint64(5); got != want {
+				t.Errorf("expected %d to be %d", got, want)
+			}
+			if got, want := remaining, tc.remaining; got != want {
+				t.Errorf("expected %d to be %d", got, want)
+			}
+
+			limit, remaining, _, ok, err := s.Take(ctx, "key")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := limit, uint64(5); got != want {
+				t.Errorf("expected %d to be %d", got, want)
+			}
+			if got, want := remaining, tc.remaining-1; got != want {
+				t.Errorf("expected %d to be %d", got, want)
+			}
+			if got, want := ok, true; got != want {
+				t.Errorf("expected %t to be %t", got, want)
+			}
+		})
+	}
+}
+
+func TestStore_Burst_new_key_resets(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	s, err := New(&Config{Tokens: 2, Interval: time.Hour, DisablePurge: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := s.Close(ctx); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err := s.Burst(ctx, "key", 3); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 6; i++ {
+		_, _, _, ok, err := s.Take(ctx, "key")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := i < 5; ok != want {
+			t.Errorf("initial Take %d: got ok %t, want %t", i, ok, want)
+		}
+	}
+
+	// Move the bucket to the previous interval without waiting for an hour.
+	v, _ := s.(*store).data.Load("key")
+	b := v.(*bucket)
+	b.lock.Lock()
+	b.startTime -= uint64(time.Hour)
+	b.lock.Unlock()
+
+	for i := 0; i < 3; i++ {
+		limit, remaining, _, ok, err := s.Take(ctx, "key")
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantRemaining := uint64(0)
+		if i == 0 {
+			wantRemaining = 1
+		}
+		if got, want := limit, uint64(2); got != want {
+			t.Errorf("expected %d to be %d", got, want)
+		}
+		if got, want := remaining, wantRemaining; got != want {
+			t.Errorf("expected %d to be %d", got, want)
+		}
+		if got, want := ok, i < 2; got != want {
+			t.Errorf("expected %t to be %t", got, want)
+		}
+	}
+}
+
+func TestStore_Burst_concurrent_new_key(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	s, err := New(&Config{Tokens: 5, Interval: time.Hour, DisablePurge: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := s.Close(ctx); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	const count = 32
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			if err := s.Burst(ctx, "key", 1); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	limit, remaining, err := s.Get(ctx, "key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := limit, uint64(5); got != want {
+		t.Errorf("expected %d to be %d", got, want)
+	}
+	if got, want := remaining, uint64(5+count); got != want {
 		t.Errorf("expected %d to be %d", got, want)
 	}
 }

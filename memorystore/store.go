@@ -173,7 +173,8 @@ func (s *store) Burst(ctx context.Context, key string, tokens uint64) error {
 
 	// No current record for the key. Create one pre-filled with the burst; if
 	// another goroutine raced us, burst onto the winner instead.
-	b := newBucket(s.tokens+tokens, s.interval)
+	b := newBucket(s.tokens, s.interval)
+	b.burst(tokens)
 	if actual, loaded := s.data.LoadOrStore(key, b); loaded {
 		actual.(*bucket).burst(tokens)
 	}
